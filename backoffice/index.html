@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fil">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Friesta Back Office</title>
+<meta name="theme-color" content="#4A0309">
+<meta name="description" content="Friesta Back Office: sales reports, items, employees">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Friesta Office">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<link rel="stylesheet" href="bo.css">
+</head>
+<body>
+<div id="gate" hidden></div>
+<div class="bo" id="app" hidden>
+  <header class="topbar">
+    <button class="burger" id="burger" aria-label="Menu"><span data-ic="menu"></span></button>
+    <div class="brand"><img src="../shared/logo.jpg" alt="Friesta"><h1 id="title">Sales summary</h1></div>
+    <div class="sp"></div>
+    <div class="status" id="status"><i></i><span></span></div>
+    <div class="acct" id="acct"><span class="av" id="acctav"></span><span id="acctname"></span></div>
+  </header>
+  <nav class="side" id="side" aria-label="Back office">
+    <div class="grp"><span data-ic="chart"></span>Reports</div>
+    <a href="#summary">Sales summary</a>
+    <a href="#by-item">Sales by item</a>
+    <a href="#by-category">Sales by category</a>
+    <a href="#by-employee">Sales by employee</a>
+    <a href="#by-payment">Sales by payment type</a>
+    <a href="#receipts">Receipts</a>
+    <a href="#discount-report">Discounts</a>
+    <a href="#shifts">Shifts</a>
+    <div class="grp"><span data-ic="box"></span>Items</div>
+    <a href="#items">Item list</a>
+    <a href="#categories">Categories</a>
+    <a href="#discounts">Discounts</a>
+    <div class="grp"><span data-ic="users"></span>People</div>
+    <a href="#employees">Employees &amp; PIN</a>
+    <div class="grp"><span data-ic="gear"></span>Store</div>
+    <a href="#settings">Settings</a>
+    <div class="foot">
+      <a href="../pos/"><span data-ic="cart"></span>Open Friesta POS</a>
+      <a href="#" id="signout"><span data-ic="logout"></span>Sign out</a>
+    </div>
+  </nav>
+  <div class="scrimside" id="scrimside"></div>
+  <main class="content" id="content"><div class="wrap" id="page"></div></main>
+</div>
+<div id="modalroot"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

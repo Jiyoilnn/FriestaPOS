@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="fil">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Friesta POS</title>
+<meta name="theme-color" content="#4A0309">
+<meta name="description" content="Friesta point of sale">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Friesta POS">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<link rel="stylesheet" href="pos.css">
+</head>
+<body>
+<div id="gate" hidden></div>
+<div id="lock" hidden></div>
+
+<div class="app" id="app" hidden>
+  <nav class="rail" id="rail" aria-label="Main">
+    <div class="logo"><img src="../shared/logo.jpg" alt="Friesta" id="logoimg"></div>
+    <button class="nav" data-view="sale" aria-current="page"><span data-ic="cart"></span>Sale</button>
+    <button class="nav" data-view="receipts"><span data-ic="receipt"></span>Receipts</button>
+    <button class="nav" data-view="shift"><span data-ic="cash"></span>Shift</button>
+    <button class="nav" data-view="settings"><span data-ic="gear"></span>Settings</button>
+    <div class="spacer"></div>
+    <a class="nav bolink" id="bolink" href="../backoffice/" hidden><span data-ic="office"></span>Back office</a>
+    <button class="me" id="mebtn" aria-label="Lock and switch cashier"><span class="av" id="meav"></span><span id="mename"></span></button>
+    <div class="syncdot" id="sync"><i></i><span></span></div>
+  </nav>
+
+  <main class="appmain">
+    <section class="view" id="v-sale">
+      <div class="catalog">
+        <div class="cathead">
+          <div class="mhead"><img src="../shared/logo.jpg" alt="Friesta"><span class="sub" id="msync"></span></div>
+          <div class="searchrow">
+            <label class="search"><span data-ic="search"></span><input id="q" type="search" placeholder="Search menu" autocomplete="off" aria-label="Search menu"></label>
+            <button class="shiftnote" id="shiftnote" hidden><span data-ic="clock"></span>Open shift</button>
+          </div>
+          <div class="cats" id="cats"></div>
+        </div>
+        <div class="gridscroll"><div class="grid" id="grid"></div></div>
+      </div>
+      <aside class="ticket" id="ticket" aria-label="Current order">
+        <div class="thead">
+          <button class="iconbtn tback" id="tback" aria-label="Back to menu"><span data-ic="back"></span></button>
+          <div class="ttl"><b id="tname">New order</b><small id="tsub">Order #001</small></div>
+          <button class="iconbtn" id="opentix" aria-label="Saved orders"><span data-ic="ticket"></span><span class="badge" id="tixbadge" hidden></span></button>
+          <button class="iconbtn" id="clear" aria-label="Clear order"><span data-ic="trash"></span></button>
+        </div>
+        <div class="otype" id="otype"><button data-ot="Dine-in">Dine-in</button><button data-ot="Take-out">Take-out</button></div>
+        <div class="lines" id="lines"></div>
+        <div class="tfoot">
+          <div class="row sm"><span>Subtotal</span><span class="num" id="subtotal">₱0.00</span></div>
+          <div class="row sm"><button class="discbtn" id="discbtn"><span data-ic="percent"></span><span id="disclabel">Add discount</span></button><span class="num" id="discamt"></span></div>
+          <div class="row total"><span>Total</span><span class="num" id="total">₱0.00</span></div>
+          <div class="tbtns">
+            <button class="btn ghost" id="savebtn" disabled>Save</button>
+            <button class="charge" id="charge" disabled><span>Charge</span><span class="num" id="chargeAmt">₱0.00</span></button>
+          </div>
+        </div>
+      </aside>
+      <button class="cartbar" id="cartbar" hidden><span><span class="cnt num" id="cartcount">0</span>View order</span><span class="num" id="cartTotal">₱0.00</span></button>
+    </section>
+
+    <section class="view" id="v-receipts" hidden><div class="page"><div class="wrap">
+      <div class="ph"><h2>Receipts</h2>
+        <label class="search" style="max-width:300px;flex:1 1 220px"><span data-ic="search"></span><input id="rq" type="search" placeholder="Receipt #, order # or item" aria-label="Search receipts"></label>
+      </div>
+      <div id="rlist" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div></div></section>
+
+    <section class="view" id="v-shift" hidden><div class="page"><div class="wrap" id="shiftwrap"></div></div></section>
+    <section class="view" id="v-settings" hidden><div class="page"><div class="wrap" id="setwrap"></div></div></section>
+  </main>
+</div>
+<div id="modalroot"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

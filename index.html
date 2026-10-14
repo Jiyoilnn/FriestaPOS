@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fil">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Friesta</title>
+<meta name="theme-color" content="#4A0309">
+<link rel="icon" href="pos/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap">
+<link rel="stylesheet" href="shared/base.css">
+<style>
+  .land{min-height:100%;display:flex;flex-direction:column;align-items:center;gap:22px;padding:32px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px));background:radial-gradient(130% 70% at 50% 0%,var(--brand-yellow) 0 34%,var(--bg) 34.2%)}
+  .land>img{width:min(340px,80vw);border-radius:14px}
+  .apps{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;width:100%;max-width:760px}
+  .app{display:flex;gap:16px;align-items:center;padding:20px;text-decoration:none;color:var(--fg);transition:transform .1s}
+  .app:hover{transform:translateY(-2px)}
+  .app img{width:84px;height:84px;border-radius:20px;flex:none;box-shadow:0 6px 16px rgba(74,3,9,.2)}
+  .app h2{margin:0;font-family:var(--display);font-size:22px}
+  .app p{margin:4px 0 0;color:var(--muted);font-size:14px}
+  .tips{max-width:760px;width:100%;padding:18px 20px}
+  .tips h3{margin:0 0 8px;font-family:var(--display)}
+  .tips ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;color:var(--muted)}
+  .tips b{color:var(--fg)}
+</style>
+</head>
+<body>
+<div class="land">
+  <img src="shared/logo.jpg" alt="Friesta — House Cut French Fries">
+  <div class="apps">
+    <a class="card app" href="pos/"><img src="pos/icon-192.png" alt=""><span><h2>Friesta POS</h2><p>Magbenta: menu, cash/GCash, resibo, shift, Bluetooth printer. May PIN para sa bawat cashier.</p></span></a>
+    <a class="card app" href="backoffice/"><img src="backoffice/icon-192.png" alt=""><span><h2>Back Office</h2><p>Reports sa kahit anong petsa: gross sales, refunds, net sales, gross profit. Items, employees at settings.</p></span></a>
+  </div>
+  <div class="card tips">
+    <h3>I-install bilang app</h3>
+    <ol>
+      <li>Buksan ang <b>Friesta POS</b> o <b>Back Office</b> sa itaas.</li>
+      <li>Android (Chrome): menu ⋮ → <b>Install app</b> / <b>Add to Home screen</b>.</li>
+      <li>iPhone (Safari): Share → <b>Add to Home Screen</b>.</li>
+      <li>Gumagana ang dalawang app kahit walang internet. Sa parehong device, iisa ang data nila.</li>
+    </ol>
+  </div>
+</div>
+</body>
+</html>
