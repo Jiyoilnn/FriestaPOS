@@ -1,11 +1,11 @@
 // Friesta Back Office — offline support.
 // App files: network first (fresh when online), cached copy when offline.
 // Fonts and the optional Firebase SDK: cached after first use.
-const VERSION = 'backoffice-v1';
+const VERSION = 'backoffice-v2';
 const CORE = [
   './', './index.html', './app.js', './bo.css', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   '../shared/base.css', '../shared/util.js', '../shared/store.js', '../shared/metrics.js',
-  '../shared/auth-ui.js', '../shared/escpos.js', '../shared/config.js', '../shared/logo.jpg'
+  '../shared/auth-ui.js', '../shared/escpos.js', '../shared/zreport.js', '../shared/config.js', '../shared/logo.jpg'
 ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));

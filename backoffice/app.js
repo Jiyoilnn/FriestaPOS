@@ -3,6 +3,7 @@ import { Store, STARTER_ITEMS, normaliseBackup, readLocalData } from '../shared/
 import { $, esc, uid, r2, pad3, peso, peso0, pesoShort, dayStart, addDays, addMonths, monthStart, weekStart, fmtTime, fmtDT, isoDate, lsGet, lsSet, toast, modal, closeModal, modalOpen, Modal, head, armed, ICON, registerSW, catchErrors, toCSV, download } from '../shared/util.js';
 import { renderGate } from '../shared/auth-ui.js';
 import * as M from '../shared/metrics.js';
+import { zHTML, vatSplit } from '../shared/zreport.js';
 
 document.querySelectorAll('[data-ic]').forEach(el => { el.outerHTML = ICON[el.dataset.ic]; });
 const NCOL = 8;
@@ -39,6 +40,7 @@ const ROUTES = {
   'receipts': { t: 'Receipts', report: true, search: true },
   'discount-report': { t: 'Discounts', report: true },
   'shifts': { t: 'Shifts', report: true, noEmp: true },
+  'zreads': { t: 'Z-readings', report: true, noEmp: true },
   'items': { t: 'Item list' },
   'categories': { t: 'Categories' },
   'discounts': { t: 'Discounts' },
@@ -130,7 +132,7 @@ function renderShell() {
 function refreshBody() {
   const b = $('pbody'); if (!b) return;
   const a = document.activeElement; if (b.contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return;
-  const fn = { 'summary': pSummary, 'by-item': pByItem, 'by-category': pByCategory, 'by-employee': pByEmployee, 'by-payment': pByPayment, 'receipts': pReceipts, 'discount-report': pDiscReport, 'shifts': pShifts, 'items': pItems, 'categories': pCategories, 'discounts': pDiscounts, 'employees': pEmployees, 'settings': pSettings }[route];
+  const fn = { 'summary': pSummary, 'by-item': pByItem, 'by-category': pByCategory, 'by-employee': pByEmployee, 'by-payment': pByPayment, 'receipts': pReceipts, 'discount-report': pDiscReport, 'shifts': pShifts, 'zreads': pZreads, 'items': pItems, 'categories': pCategories, 'discounts': pDiscounts, 'employees': pEmployees, 'settings': pSettings }[route];
   fn(b);
 }
 function shiftRange(dir) {
@@ -313,7 +315,7 @@ function pReceipts(b) {
   }
   entries.sort((a, z) => z.ts - a.ts);
   const nSale = entries.filter(e => e.kind === 'sale').length, nRef = entries.length - nSale;
-  const list = entries.filter(e => (rptTab === 'all' || e.kind === rptTab) && (!q || String(e.s.no).includes(q) || pad3(e.s.orderNo).includes(q.replace('#', '')) || (e.s.employeeName || '').toLowerCase().includes(q) || (e.s.lines || []).some(l => l.name.toLowerCase().includes(q))));
+  const list = entries.filter(e => (rptTab === 'all' || e.kind === rptTab) && (!q || String(e.s.no).toLowerCase().includes(q) || pad3(e.s.orderNo).includes(q.replace('#', '')) || (e.s.employeeName || '').toLowerCase().includes(q) || (e.s.lines || []).some(l => l.name.toLowerCase().includes(q))));
   b.innerHTML = `<div class="card"><div class="tabs">${[['all', 'All receipts', entries.length], ['sale', 'Sales', nSale], ['refund', 'Refunds', nRef]].map(([k, l, n]) => `<button data-tab="${k}" aria-pressed="${rptTab === k}">${l}<b class="num">${n}</b></button>`).join('')}</div>
     <div class="tblwrap"><table class="tbl"><thead><tr><th>Receipt no.</th><th>Date</th><th>Employee</th><th>Order</th><th>Payment</th><th>Type</th><th class="r">Total</th></tr></thead>
     <tbody>${list.slice(0, 500).map(e => `<tr class="click" data-r="${e.s.id}"><td class="num t1">${esc(e.s.no)}</td><td class="num">${fmtDT(e.ts)}</td><td>${esc(e.s.employeeName || '—')}</td><td class="num">#${pad3(e.s.orderNo)}${e.s.orderType ? ' · ' + esc(e.s.orderType) : ''}</td><td>${esc(e.s.method)}</td><td>${e.kind === 'refund' ? '<span class="pill ref">Refund</span>' : '<span class="pill ok">Sale</span>'}</td><td class="r num">${peso(e.amt)}</td></tr>`).join('') || `<tr><td colspan="7" class="sub">Walang resibo</td></tr>`}</tbody></table></div>
@@ -323,13 +325,14 @@ function pReceipts(b) {
 }
 function showReceipt(s) {
   if (!s) return; const st = Store.settings;
-  modal(head('Receipt #' + esc(s.no), esc(s.employeeName || '')) + `<div class="receipt"><img src="../shared/logo.jpg" alt="Friesta">${st.address ? `<div class="c">${esc(st.address)}</div>` : ''}
+  modal(head('Receipt #' + esc(s.no), esc(s.employeeName || '')) + `<div class="receipt"><img src="../shared/logo.jpg" alt="Friesta">${st.address ? `<div class="c">${esc(st.address)}</div>` : ''}${st.tin ? `<div class="c">TIN ${esc(st.tin)} · ${st.vatRegistered ? 'VAT REG' : 'NON-VAT'}</div>` : ''}
     <div class="c" style="margin-top:6px">ORDER</div><div class="on num">#${pad3(s.orderNo)}</div><div class="c">${s.orderType ? esc(s.orderType) + ' · ' : ''}${fmtDT(s.ts)}${s.name ? ' · ' + esc(s.name) : ''}</div><hr>
     ${(s.lines || []).map(l => `<div class="row"><span>${l.qty} × ${esc(l.name)}${l.variant ? ' (' + esc(l.variant) + ')' : ''}</span><span>${peso(l.price * l.qty)}</span></div>${l.note ? `<div class="nt">↳ ${esc(l.note)}</div>` : ''}`).join('')}<hr>
     <div class="row"><span>Subtotal</span><span>${peso(s.subtotal)}</span></div>${s.discount ? `<div class="row"><span>${esc(s.discountLabel)}</span><span>−${peso(s.discount)}</span></div>` : ''}
     <div class="row" style="font-weight:900;font-size:18px"><span>TOTAL</span><span>${peso(s.total)}</span></div>
     <div class="row"><span>${esc(s.method)}${s.ref ? ' · Ref ' + esc(s.ref) : ''}</span><span>${peso(s.tendered)}</span></div>${s.method === 'Cash' ? `<div class="row"><span>Change</span><span>${peso(s.change)}</span></div>` : ''}
     ${s.status === 'refunded' ? `<div class="row" style="color:#B3261E;font-weight:900"><span>REFUNDED${s.refundedBy ? ' · ' + esc(s.refundedBy) : ''}</span><span>${fmtDT(s.refundedAt)}</span></div>` : ''}
+    <hr><div class="c">Receipt ${esc(s.no)}</div>${st.showNotice !== false && st.receiptNotice ? `<div class="c" style="font-weight:900;color:#2A0A0C">${esc(st.receiptNotice)}</div>` : ''}
     <hr><div class="row"><span>Cost of goods</span><span>${peso(M.saleCost(s))}</span></div><div class="row"><span>Gross profit</span><span>${peso(s.total - M.saleCost(s))}</span></div></div>
     <div class="actions"><button class="btn" data-close>Close</button></div>`);
 }
@@ -339,6 +342,16 @@ function pDiscReport(b) {
     <div class="tblwrap"><table class="tbl"><thead><tr><th>Name</th><th class="r">Discounts applied</th><th class="r">Amount discounted</th></tr></thead>
     <tbody>${rows.map(r => `<tr><td class="t1">${esc(r.name)}</td><td class="r num">${r.count}</td><td class="r num">${peso(r.amount)}</td></tr>`).join('') || `<tr><td colspan="3" class="sub">Walang discount sa panahong ito</td></tr>`}</tbody></table></div></div>`;
   $('csv').addEventListener('click', () => csvOut('discounts', [['Name', 'Discounts applied', 'Amount discounted'], ...rows.map(r => [r.name, r.count, r2(r.amount)])]));
+}
+function pZreads(b) {
+  const list = Store.data.zreads.filter(z => z.to >= range.from && z.to < range.to);
+  const vat = !!Store.settings.vatRegistered;
+  b.innerHTML = `<div class="card"><div class="secthead"><h3>Z-readings</h3><button class="btn ghost sm" id="csv">${ICON.download} Download CSV</button></div>
+    <div class="tblwrap"><table class="tbl"><thead><tr><th>Z No.</th><th>Device</th><th>Closed</th><th>Receipts</th><th class="r">Gross sales</th><th class="r">Discounts</th><th class="r">Refunds</th><th class="r">Net sales</th>${vat ? '<th class="r">VAT</th>' : ''}<th class="r">Accumulated sales</th><th>By</th></tr></thead>
+    <tbody>${list.map(z => `<tr class="click" data-z="${z.id}"><td class="num t1">${String(z.zNo).padStart(4, '0')}</td><td class="num">${esc((z.deviceId || '').toUpperCase())}</td><td class="num">${fmtDT(z.to)}</td><td class="num">${esc(z.begNo || '—')} – ${esc(z.endNo || '—')}</td><td class="r num">${peso(z.gross)}</td><td class="r num">${peso(z.discounts)}</td><td class="r num">${peso(z.refunds)}</td><td class="r num">${peso(z.net)}</td>${vat ? `<td class="r num">${peso(vatSplit(z, true).vat)}</td>` : ''}<td class="r num">${peso(z.endGT)}</td><td>${esc(z.by || '')}</td></tr>`).join('') || `<tr><td colspan="${vat ? 11 : 10}" class="sub">Walang Z-reading sa panahong ito. Ginagawa ito sa POS: Shift → Z-reading.</td></tr>`}</tbody></table></div></div>`;
+  b.querySelectorAll('[data-z]').forEach(x => x.addEventListener('click', () => { const z = Store.data.zreads.find(y => y.id === x.dataset.z); modal(head('Z-reading') + zHTML(z, Store.settings, 'Z') + '<div class="actions"><button class="btn" data-close>Close</button></div>'); }));
+  $('csv').addEventListener('click', () => csvOut('z-readings', [['Z No.', 'Device', 'From', 'To', 'Beginning receipt', 'Ending receipt', 'Sales transactions', 'Refund transactions', 'Gross sales', 'Senior/PWD discount', 'Other discounts', 'Refunds', 'Net sales', ...(vat ? ['VATable sales', 'VAT', 'VAT-exempt sales'] : []), 'Beginning accumulated', 'Ending accumulated', 'By'],
+    ...list.map(z => { const v = vatSplit(z, vat); return [z.zNo, (z.deviceId || '').toUpperCase(), fmtDT(z.from || z.to), fmtDT(z.to), z.begNo, z.endNo, z.count, z.refundCount, r2(z.gross), r2(z.scDiscount), r2(z.otherDiscount), r2(z.refunds), r2(z.net), ...(v ? [r2(v.vatable), r2(v.vat), r2(v.exempt)] : []), r2(z.begGT), r2(z.endGT), z.by || '']; })]));
 }
 function pShifts(b) {
   const list = Store.data.shifts.filter(s => s.openedAt >= range.from && s.openedAt < range.to);
@@ -508,6 +521,10 @@ function pSettings(b) {
       <div class="field"><label for="sn">Store name</label><input id="sn" maxlength="40" value="${esc(s.storeName)}"></div>
       <div class="field"><label for="sa">Address / contact sa resibo</label><input id="sa" maxlength="90" value="${esc(s.address)}" placeholder="e.g. Stall 5, SM City · 0917 123 4567"></div>
       <div class="field"><label for="sf">Mensahe sa resibo</label><input id="sf" maxlength="90" value="${esc(s.footer)}"></div>
+      <div class="toggle"><span>Ipakita ang paalala na hindi ito BIR invoice<div class="sub">Lalabas sa ibaba ng bawat resibo at Z-reading</div></span><button type="button" class="switch" role="switch" id="s-nt" aria-checked="${s.showNotice !== false}" aria-label="Show notice"></button></div>
+      <div class="field"><label for="snt">Paalala sa resibo</label><input id="snt" maxlength="60" value="${esc(s.receiptNotice || 'THIS IS NOT A BIR SALES INVOICE')}"></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px"><div class="field"><label for="srn">Registered business name</label><input id="srn" maxlength="60" value="${esc(s.regName || '')}" placeholder="Kung iba sa store name"></div><div class="field"><label for="stin">TIN</label><input id="stin" maxlength="20" inputmode="numeric" value="${esc(s.tin || '')}" placeholder="000-000-000-00000"></div></div>
+      <div class="toggle"><span>VAT-registered<div class="sub">Ipapakita ang VATable sales, VAT at VAT-exempt (Senior/PWD) sa Z-reading</div></span><button type="button" class="switch" role="switch" id="s-vat" aria-checked="${!!s.vatRegistered}" aria-label="VAT registered"></button></div>
       <div class="flabel" style="margin-top:6px">POS</div>
       <div class="toggle"><span>Itanong ang Dine-in o Take-out</span><button type="button" class="switch" role="switch" id="s-ot" aria-checked="${!!s.askOrderType}" aria-label="Ask order type"></button></div>
       <div class="toggle"><span>Kailangan ng bukas na shift bago magbenta</span><button type="button" class="switch" role="switch" id="s-rs" aria-checked="${!!s.requireShift}" aria-label="Require shift"></button></div>
@@ -529,7 +546,7 @@ function pSettings(b) {
   if (cloud && !lsGet('localImported')) offerLocalImport();
   const on = id => $(id).getAttribute('aria-checked') === 'true';
   b.querySelectorAll('#stf .switch').forEach(x => x.addEventListener('click', () => x.setAttribute('aria-checked', x.getAttribute('aria-checked') !== 'true')));
-  $('stf').addEventListener('submit', async e => { e.preventDefault(); await Store.saveSettings({ storeName: $('sn').value.trim() || 'Friesta', address: $('sa').value.trim(), footer: $('sf').value.trim(), askOrderType: on('s-ot'), requireShift: on('s-rs'), refundNeedsManager: on('s-rm') }); document.activeElement.blur(); toast('Na-save ang settings'); });
+  $('stf').addEventListener('submit', async e => { e.preventDefault(); await Store.saveSettings({ storeName: $('sn').value.trim() || 'Friesta', address: $('sa').value.trim(), footer: $('sf').value.trim(), showNotice: on('s-nt'), receiptNotice: $('snt').value.trim() || 'THIS IS NOT A BIR SALES INVOICE', regName: $('srn').value.trim(), tin: $('stin').value.trim(), vatRegistered: on('s-vat'), askOrderType: on('s-ot'), requireShift: on('s-rs'), refundNeedsManager: on('s-rm') }); document.activeElement.blur(); toast('Na-save ang settings'); });
   $('pwf').addEventListener('submit', async e => {
     e.preventDefault(); const er = $('pwerr'); er.hidden = true;
     if ($('np').value.length < 6) { er.textContent = 'Gumamit ng password na hindi bababa sa 6 na character.'; er.hidden = false; return; }

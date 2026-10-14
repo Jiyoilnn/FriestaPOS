@@ -111,3 +111,24 @@ Parehong dahilan: i-publish ang Firestore Rules.
 
 **Walang PIN na gumagana sa unang bukas**
 Pindutin ang **Gamitin ang account password** sa PIN screen. Kapag wala pang owner PIN, hihingin ng app na gumawa ng bago.
+
+## BIR: paalala sa resibo at X/Z-reading
+
+**Hindi BIR-accredited ang Friesta POS** at wala itong Permit to Use (PTU). Kaya may nakalagay na **"THIS IS NOT A BIR SALES INVOICE"** sa ibaba ng bawat resibo (screen, kopya at printed). Mag-isyu ng BIR-registered sales invoice nang hiwalay kapag kailangan. Puwedeng palitan ang paalala o i-off sa **Back Office → Settings**. I-off lang kapag may PTU ka na.
+
+Sa **Back Office → Settings**, ilagay din ang **Registered business name**, **TIN** at kung **VAT-registered** ka. Lalabas ang mga ito sa resibo at sa Z-reading.
+
+**Receipt numbers:** sunod-sunod at hindi nare-reset bawat device (hal. `7MS20W-000123`). Ang unang bahagi ay ang code ng device.
+
+**X-reading** (POS → Shift): tinitingnan ang benta mula sa huling Z-reading. Walang nire-reset.
+
+**Z-reading** (POS → Shift → Z-reading (end of day)): gawin sa pagsasara. Ise-save nito ang:
+- unang at huling receipt number at bilang ng transactions
+- gross sales, Senior/PWD discount, ibang discount, refunds, **net sales**
+- VATable sales, VAT 12% at VAT-exempt (Senior/PWD) kung VAT-registered
+- bawat payment type
+- **accumulated sales** (beginning at ending), na tuloy-tuloy at hindi nare-reset
+
+Makikita lahat ng Z-reading sa **Back Office → Z-readings**, na may CSV download.
+
+> Paalala: ang X/Z-reading at sunod-sunod na numero ay bahagi lang ng hinihingi ng BIR. Kung balak mong ipa-accredit o ipa-register ang Friesta POS, kumonsulta sa RDO o accountant mo para sa kumpletong requirements.

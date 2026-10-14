@@ -2,6 +2,7 @@
 // Works in Chrome on Android, Windows, macOS and ChromeOS (Web Bluetooth).
 
 import { lsGet, lsSet, sleep, peso, pad3, fmtDT, fmtTime } from './util.js';
+import { vatSplit } from './zreport.js';
 
 const SERVICES = [
   '000018f0-0000-1000-8000-00805f9b34fb', '0000ff00-0000-1000-8000-00805f9b34fb', '0000ffe0-0000-1000-8000-00805f9b34fb',
@@ -121,7 +122,9 @@ export function receiptBytes(s, settings, cfg = printerCfg()) {
   e.align(1);
   const logo = cfg.logo ? logoRaster(cfg.paper) : null;
   if (logo) e.raster(logo).line(); else e.bold(1).size(2, 2).line(settings.storeName).size(1, 1).bold(0);
+  if (settings.regName && settings.regName !== settings.storeName) e.wrapped(settings.regName);
   if (settings.address) e.wrapped(settings.address);
+  if (settings.tin) e.line('TIN ' + settings.tin + (settings.vatRegistered ? ' VAT REG' : ' NON-VAT'));
   e.line().line('ORDER').bold(1).size(2, 2).line('#' + pad3(s.orderNo)).size(1, 1).bold(0);
   const sub = [s.orderType, s.name].filter(Boolean).join(' - '); if (sub) e.line(sub);
   e.line(fmtDT(s.ts));
@@ -136,7 +139,9 @@ export function receiptBytes(s, settings, cfg = printerCfg()) {
   if (s.status === 'refunded') e.align(1).bold(1).line('*** REFUNDED ***').bold(0).align(0);
   e.hr().align(1);
   if (settings.footer) e.wrapped(settings.footer);
-  e.line('Receipt ' + s.no).feed(4).cut();
+  e.line('Receipt ' + s.no);
+  if (settings.showNotice !== false && settings.receiptNotice) e.bold(1).wrapped(settings.receiptNotice).bold(0);
+  e.feed(4).cut();
   return e.bytes();
 }
 export function kitchenBytes(s, cfg = printerCfg()) {
@@ -153,4 +158,24 @@ export function testBytes(settings, cfg = printerCfg()) {
   e.bold(1).line('Printer connected!').bold(0).line(settings.storeName + ' POS').line(fmtDT(Date.now())).align(0).hr();
   e.line('1234567890'.repeat(5).slice(0, e.cols)).lr('Left', 'Right').lr('Sample item', 'P99.00');
   return e.hr().feed(4).cut().bytes();
+}
+
+export function zBytes(z, settings, kind = 'Z', cfg = printerCfg()) {
+  const e = new Esc(cfg.paper === 80 ? 48 : 32), v = vatSplit(z, settings.vatRegistered);
+  e.align(1).bold(1).wrapped(settings.regName || settings.storeName).bold(0);
+  if (settings.address) e.wrapped(settings.address);
+  if (settings.tin) e.line('TIN ' + settings.tin + (settings.vatRegistered ? ' VAT REG' : ' NON-VAT'));
+  e.line().bold(1).size(2, 2).line(kind === 'Z' ? 'Z-READING' : 'X-READING').size(1, 1).bold(0);
+  if (kind === 'Z') e.line('Z No. ' + String(z.zNo).padStart(4, '0'));
+  e.line('Device ' + (z.deviceId || '').toUpperCase()).line(fmtDT(z.from || z.to)).line('to ' + fmtDT(z.to)).align(0).hr();
+  e.lr('Beginning receipt', z.begNo || '-').lr('Ending receipt', z.endNo || '-').lr('Sales transactions', String(z.count)).lr('Refund transactions', String(z.refundCount)).hr();
+  e.lr('Gross sales', peso(z.gross)).lr('Less: Senior/PWD disc.', peso(z.scDiscount)).lr('Less: Other discounts', peso(z.otherDiscount)).lr('Less: Refunds', peso(z.refunds));
+  e.bold(1).lr('NET SALES', peso(z.net)).bold(0);
+  if (v) e.hr().lr('VATable sales', peso(v.vatable)).lr('VAT (12%)', peso(v.vat)).lr('VAT-exempt sales', peso(v.exempt));
+  e.hr(); Object.entries(z.byMethod || {}).forEach(([m, a]) => e.lr(m, peso(a)));
+  e.hr().lr('Beg. accumulated sales', peso(z.begGT || 0)).bold(1).lr('End accumulated sales', peso(z.endGT || 0)).bold(0).hr();
+  e.align(1).line((kind === 'Z' ? 'Generated ' : 'Printed ') + fmtDT(z.createdAt || Date.now()));
+  if (z.by) e.line(z.by);
+  if (settings.showNotice !== false && settings.receiptNotice) e.bold(1).wrapped(settings.receiptNotice).bold(0);
+  return e.feed(4).cut().bytes();
 }

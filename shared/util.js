@@ -7,7 +7,7 @@ export const r2 = n => Math.round((+n || 0) * 100) / 100;
 export const pad3 = n => String(n || 0).padStart(3, '0');
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-export const peso = n => (n < 0 ? '−' : '') + '₱' + Math.abs(r2(n)).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const peso = n => (r2(n) < 0 ? '−' : '') + '₱' + Math.abs(r2(n)).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const peso0 = n => '₱' + (+n || 0).toLocaleString('en-PH', { maximumFractionDigits: 2 });
 export const pesoShort = n => {
   const a = Math.abs(n);

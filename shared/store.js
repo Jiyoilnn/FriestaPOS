@@ -12,11 +12,13 @@
 import { FIREBASE_CONFIG, FIREBASE_VERSION } from './config.js';
 import { uid, randomHex, pbkdf2, sha256, lsGet, lsSet, sleep } from './util.js';
 
-export const COLS = ['items', 'sales', 'shifts', 'tickets', 'employees', 'discounts'];
+export const COLS = ['items', 'sales', 'shifts', 'tickets', 'employees', 'discounts', 'zreads'];
 export const DEFAULT_SETTINGS = {
   storeName: 'Friesta', address: '', footer: 'Salamat po! Balik kayo sa Friesta.',
   askOrderType: true, defaultOrderType: 'Take-out', requireShift: false,
-  refundNeedsManager: true, autoLockMin: 0, pinSalt: ''
+  refundNeedsManager: true, autoLockMin: 0, pinSalt: '',
+  regName: '', tin: '', vatRegistered: false,
+  showNotice: true, receiptNotice: 'THIS IS NOT A BIR SALES INVOICE'
 };
 export const DEFAULT_DISCOUNTS = [
   { id: 'd-promo10', name: 'Promo 10%', type: 'pct', value: 10 },
@@ -41,7 +43,8 @@ const sorters = {
   tickets: (a, b) => a.ts - b.ts,
   items: (a, b) => (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || ''),
   employees: (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
-  discounts: (a, b) => (a.name || '').localeCompare(b.name || '')
+  discounts: (a, b) => (a.name || '').localeCompare(b.name || ''),
+  zreads: (a, b) => b.createdAt - a.createdAt
 };
 const clean = o => JSON.parse(JSON.stringify(o));
 const stripId = ({ id, ...rest }) => clean(rest);
@@ -60,7 +63,7 @@ export const Store = {
   mode: FIREBASE_CONFIG ? 'cloud' : 'local',
   status: 'loading', // loading | needs-setup | signed-out | ready | cloud-unavailable
   online: navigator.onLine,
-  data: { items: [], sales: [], shifts: [], tickets: [], employees: [], discounts: [] },
+  data: { items: [], sales: [], shifts: [], tickets: [], employees: [], discounts: [], zreads: [] },
   settings: { ...DEFAULT_SETTINGS },
   account: null,
   pending: (lsGet('outbox') || []).length, // cloud writes waiting to be accepted
@@ -127,6 +130,7 @@ export function normaliseBackup(d) {
     shifts: d.shifts || [], tickets: d.tickets || [],
     employees: Array.isArray(d.employees) ? d.employees : null,
     discounts: Array.isArray(d.discounts) ? d.discounts : null,
+    zreads: Array.isArray(d.zreads) ? d.zreads : null,
     settings: d.settings || {}
   };
 }
@@ -150,7 +154,7 @@ const Local = {
   db: null,
   open() {
     return new Promise((res, rej) => {
-      const r = indexedDB.open('friesta', 1);
+      const r = indexedDB.open('friesta', 2);
       r.onupgradeneeded = () => {
         const db = r.result;
         COLS.forEach(c => { if (!db.objectStoreNames.contains(c)) db.createObjectStore(c, { keyPath: 'id' }); });
@@ -323,6 +327,7 @@ const Cloud = {
     }));
     ['items', 'employees', 'discounts', 'tickets'].forEach(c => watch(c, Cloud.col(c)));
     watch('shifts', query(Cloud.col('shifts'), orderBy('openedAt', 'desc'), limit(150)));
+    watch('zreads', query(Cloud.col('zreads'), orderBy('createdAt', 'desc'), limit(200)));
     firsts.push(new Promise(res => {
       unsubs.push(onSnapshot(Cloud.ref('meta', 'settings'), s => {
         Store.settings = { ...DEFAULT_SETTINGS, ...(s.exists() ? s.data() : {}) };

@@ -3,7 +3,8 @@ import { Store, STARTER_ITEMS } from '../shared/store.js';
 import { $, esc, uid, r2, pad3, peso, peso0, dayStart, addDays, fmtTime, fmtDT, lsGet, lsSet, toast, modal, closeModal, modalOpen, Modal, head, armed, ICON, registerSW, catchErrors, keepAwake } from '../shared/util.js';
 import { renderGate, pinPad } from '../shared/auth-ui.js';
 import { shiftNumbers } from '../shared/metrics.js';
-import { Printer, printerCfg, savePrinterCfg, canPrint, receiptBytes, kitchenBytes, testBytes, setLogo } from '../shared/escpos.js';
+import { zSummary, zHTML } from '../shared/zreport.js';
+import { Printer, printerCfg, savePrinterCfg, canPrint, receiptBytes, kitchenBytes, testBytes, zBytes, setLogo } from '../shared/escpos.js';
 
 const NCOL = 8;
 const NOTE_CHIPS = ['Less salt', 'No salt', 'Extra crispy', 'Sauce on the side', 'No ice', 'Pa-hiwalay'];
@@ -144,6 +145,12 @@ function totals() {
   return { subtotal, discount, total: r2(Math.max(0, subtotal - discount)), count: cart.lines.reduce((a, l) => a + l.qty, 0) };
 }
 const openShift = () => Store.data.shifts.find(s => s.status === 'open') || null;
+// Receipt numbers run in sequence per device and never reset (e.g. 7K2Q-000123).
+function nextReceiptNo() {
+  const fromSales = sales.filter(s => s.deviceId === deviceId && s.seq).reduce((m, s) => Math.max(m, s.seq), 0);
+  const seq = Math.max(fromSales, +(lsGet('seq') || 0)) + 1; lsSet('seq', seq);
+  return { seq, no: `${deviceId.toUpperCase()}-${String(seq).padStart(6, '0')}` };
+}
 function nextOrderNo() { const t = dayStart(); return sales.filter(s => s.ts >= t).reduce((m, s) => Math.max(m, +s.orderNo || 0), 0) + 1; }
 
 /* ================= navigation ================= */
@@ -341,7 +348,7 @@ function openCharge() {
     const now = new Date(), p = n => String(n).padStart(2, '0');
     const tend = method === 'Cash' ? r2(tendered()) : t.total, sh = openShift();
     const sale = {
-      id: uid(), no: `${String(now.getFullYear()).slice(2)}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`,
+      id: uid(), ...nextReceiptNo(),
       orderNo: nextOrderNo(), ts: now.getTime(), orderType: Store.settings.askOrderType ? cart.orderType : '', name: cart.name || '',
       lines: cart.lines.map(({ itemId, name, variant, category, price, cost, qty, note }) => ({ itemId, name, variant, category: category || 'Other', price, cost: +cost || 0, qty, note })),
       subtotal: t.subtotal, discount: t.discount, discountLabel: t.discount ? cart.disc.label : '', total: t.total,
@@ -380,7 +387,7 @@ function showDone(s) {
 /* ================= RECEIPTS ================= */
 function renderReceipts() {
   const q = $('rq').value.trim().toLowerCase();
-  const list = sales.filter(s => !q || String(s.no).includes(q) || pad3(s.orderNo).includes(q.replace('#', '')) || (s.lines || []).some(l => (l.name + ' ' + (l.variant || '')).toLowerCase().includes(q)));
+  const list = sales.filter(s => !q || String(s.no).toLowerCase().includes(q) || pad3(s.orderNo).includes(q.replace('#', '')) || (s.lines || []).some(l => (l.name + ' ' + (l.variant || '')).toLowerCase().includes(q)));
   if (!sales.length) { $('rlist').innerHTML = `<div class="card"><div class="empty"><h3>Wala pang resibo</h3><p>Lahat ng benta sa huling 14 na araw ay makikita dito. Ang mas luma ay nasa Back Office.</p></div></div>`; return; }
   if (!list.length) { $('rlist').innerHTML = `<div class="card"><div class="empty"><p>Walang tugma.</p></div></div>`; return; }
   const groups = new Map();
@@ -401,7 +408,7 @@ function receiptHTML(s) {
   const st = Store.settings;
   return `<div class="receipt">
     <img src="../shared/logo.jpg" alt="Friesta">
-    ${st.address ? `<div class="c">${esc(st.address)}</div>` : ''}
+    ${st.regName && st.regName !== st.storeName ? `<div class="c">${esc(st.regName)}</div>` : ''}${st.address ? `<div class="c">${esc(st.address)}</div>` : ''}${st.tin ? `<div class="c">TIN ${esc(st.tin)} · ${st.vatRegistered ? 'VAT REG' : 'NON-VAT'}</div>` : ''}
     <div class="c" style="margin-top:6px">ORDER</div><div class="on num">#${pad3(s.orderNo)}</div>
     <div class="c">${s.orderType ? esc(s.orderType) + ' · ' : ''}${fmtDT(s.ts)}${s.name ? ' · ' + esc(s.name) : ''}</div>
     ${s.employeeName ? `<div class="c">Cashier: ${esc(s.employeeName)}</div>` : ''}<hr>
@@ -412,7 +419,7 @@ function receiptHTML(s) {
     <div class="row"><span>${esc(s.method)}${s.ref ? ' · Ref ' + esc(s.ref) : ''}</span><span>${peso(s.tendered)}</span></div>
     ${s.method === 'Cash' ? `<div class="row"><span>Change</span><span>${peso(s.change)}</span></div>` : ''}
     ${s.status === 'refunded' ? `<div class="row" style="color:#B3261E;font-weight:900"><span>REFUNDED${s.refundedBy ? ' · ' + esc(s.refundedBy) : ''}</span><span>${s.refundedAt ? fmtDT(s.refundedAt) : ''}</span></div>` : ''}
-    <hr><div class="c">${esc(st.footer)}</div><div class="c">Receipt ${esc(s.no)}</div></div>`;
+    <hr><div class="c">${esc(st.footer)}</div><div class="c">Receipt ${esc(s.no)}</div>${st.showNotice !== false && st.receiptNotice ? `<div class="c" style="font-weight:900;color:#2A0A0C">${esc(st.receiptNotice)}</div>` : ''}</div>`;
 }
 function receiptText(s) {
   const L = [Store.settings.storeName, Store.settings.address || null, `Order #${pad3(s.orderNo)}${s.orderType ? ' · ' + s.orderType : ''}`, `Receipt ${s.no} · ${fmtDT(s.ts)}`, '--------------------------------'];
@@ -420,6 +427,7 @@ function receiptText(s) {
   L.push('--------------------------------', `Subtotal  ${peso(s.subtotal)}`); if (s.discount) L.push(`${s.discountLabel}  -${peso(s.discount)}`);
   L.push(`TOTAL  ${peso(s.total)}`, `${s.method}${s.ref ? ' Ref ' + s.ref : ''}  ${peso(s.tendered)}`); if (s.method === 'Cash') L.push(`Change  ${peso(s.change)}`);
   if (s.status === 'refunded') L.push('*** REFUNDED ***'); if (Store.settings.footer) L.push('', Store.settings.footer);
+  if (Store.settings.showNotice !== false && Store.settings.receiptNotice) L.push(Store.settings.receiptNotice);
   return L.filter(x => x !== null).join('\n');
 }
 function showReceipt(s0) {
@@ -436,7 +444,7 @@ function showReceipt(s0) {
     if (!approver) return;
     const sh = openShift();
     try {
-      await Store.put('sales', { ...s, status: 'refunded', refundedAt: Date.now(), refundShiftId: sh ? sh.id : null, refundedBy: approver.name });
+      await Store.put('sales', { ...s, status: 'refunded', refundedAt: Date.now(), refundShiftId: sh ? sh.id : null, refundDeviceId: deviceId, refundedBy: approver.name });
       adjustStock(s.lines || [], +1); closeModal(); toast(`Order #${pad3(s.orderNo)} refunded`);
     } catch (e) { failed(e); }
   });
@@ -459,7 +467,7 @@ function renderShift() {
     return `<div class="it"><span class="grow"><span class="t1">${fmtDT(s.openedAt)} – ${fmtTime(s.closedAt)}</span><div class="sub num">${esc(s.closedBy || '')} · Net ${peso(s.net || 0)} · Expected ${peso(s.expected)} · Counted ${peso(s.counted)}</div></span><span class="pill ${Math.abs(diff) < 0.01 ? 'ok' : diff < 0 ? 'ref' : 'low'} num">${Math.abs(diff) < 0.01 ? 'Balanced' : (diff < 0 ? 'Short ' : 'Over ') + peso(Math.abs(diff))}</span></div>`;
   }).join('')}</div>` : '';
   if (!sh) {
-    w.innerHTML = `<div class="ph"><h2>Shift</h2></div><div class="card"><div class="empty"><h3>Walang bukas na shift</h3><p>Mag-open ng shift sa umpisa ng araw at ilagay ang panimulang cash. Sa pagsasara, bilangin ang pera at sasabihin ng Friesta kung short o over.</p><button class="btn lg" data-act="openshift" style="min-width:220px">Open shift</button></div></div>${histHTML}`;
+    w.innerHTML = `<div class="ph"><h2>Shift</h2></div><div class="card"><div class="empty"><h3>Walang bukas na shift</h3><p>Mag-open ng shift sa umpisa ng araw at ilagay ang panimulang cash. Sa pagsasara, bilangin ang pera at sasabihin ng Friesta kung short o over.</p><button class="btn lg" data-act="openshift" style="min-width:220px">Open shift</button></div></div>${zSection()}${histHTML}`;
     return;
   }
   const n = shiftNumbers(sh, sales);
@@ -478,6 +486,7 @@ function renderShift() {
   ${Object.keys(n.byMethod).length ? `<div class="card sec"><div class="tblwrap"><table class="tbl"><thead><tr><th>Payment type</th><th class="r">Amount</th></tr></thead><tbody>${Object.entries(n.byMethod).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="r num">${peso(v)}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
   <div class="actions"><button class="btn ghost" data-act="payin">Pay in</button><button class="btn ghost" data-act="payout">Pay out</button><button class="btn" data-act="closeshift">Close shift</button></div>
   ${(sh.moves || []).length ? `<div class="glabel" style="margin-top:6px">Cash movements</div><div class="card list">${sh.moves.map(m => `<div class="it"><span class="grow"><span class="t1">${m.type === 'in' ? 'Pay in' : 'Pay out'}${m.note ? ' · ' + esc(m.note) : ''}</span><div class="sub">${fmtTime(m.ts)}${m.by ? ' · ' + esc(m.by) : ''}</div></span><b class="num" style="color:var(${m.type === 'in' ? '--good' : '--bad'})">${m.type === 'in' ? '+' : '−'}${peso(m.amt)}</b></div>`).join('')}</div>` : ''}
+  ${zSection()}
   ${histHTML}`;
 }
 function amountModal(title, sub, label, withNote, cb) {
@@ -491,7 +500,48 @@ function amountModal(title, sub, label, withNote, cb) {
   };
   $('amtok').addEventListener('click', ok); $('amt').addEventListener('keydown', e => { if (e.key === 'Enter') ok(); });
 }
+/* ---------- X / Z reading (this device) ---------- */
+const myZs = () => Store.data.zreads.filter(z => z.deviceId === deviceId);
+function currentX() {
+  const last = myZs()[0], from = last ? last.to : 0, to = Date.now();
+  const z = zSummary(sales, from, to, deviceId);
+  return { ...z, begGT: last ? +last.endGT || 0 : 0, endGT: r2((last ? +last.endGT || 0 : 0) + z.net), zNo: (last ? +last.zNo || 0 : 0) + 1, last };
+}
+function zSection() {
+  const x = currentX(), list = myZs().slice(0, 7);
+  return `<div class="glabel" style="margin-top:8px">End of day · X/Z reading</div>
+  <div class="card form">
+    <div class="row"><span><span class="t1">Mula sa huling Z-reading</span><div class="sub">${x.last ? `Z No. ${String(x.last.zNo).padStart(4, '0')} · ${fmtDT(x.last.to)}` : 'Wala pang Z-reading sa device na ito'} · ${x.count} benta</div></span><b class="disp num" style="font-size:20px">${peso(x.net)}</b></div>
+    <div class="actions"><button class="btn ghost" data-act="xread">X-reading</button><button class="btn" data-act="zread">Z-reading (end of day)</button></div>
+    ${list.length ? `<div class="card list">${list.map(z => `<button class="it" data-z="${z.id}"><span class="grow"><span class="t1">Z No. ${String(z.zNo).padStart(4, '0')}</span><div class="sub">${fmtDT(z.to)} · ${z.count} benta${z.by ? ' · ' + esc(z.by) : ''}</div></span><b class="num">${peso(z.net)}</b></button>`).join('')}</div>` : ''}
+    <div class="sub">Gawin ang Z-reading sa pagsasara ng tindahan. Nire-record nito ang benta ng araw at ang accumulated sales ng device na ito.</div>
+  </div>`;
+}
+function showZ(z, kind) {
+  modal(head(kind === 'Z' ? 'Z-reading' : 'X-reading', kind === 'Z' ? '' : 'Hindi nire-reset. Pang-check lang ng benta.') + zHTML(z, Store.settings, kind) +
+    `<div class="actions">${canPrint() ? `<button class="btn ghost" id="zpr">${ICON.printer} Print</button>` : ''}<button class="btn" data-close>Done</button></div>`);
+  const b = $('zpr'); if (b) b.addEventListener('click', async () => {
+    if (!(await Printer.ready())) { toast('Hindi connected ang printer. Settings → Connect printer.'); return; }
+    try { await Printer.write(zBytes(z, Store.settings, kind)); toast('Printed'); } catch (e) { toast('Hindi nag-print. I-on ang printer at subukan ulit.'); }
+  });
+}
+function runZ() {
+  const x = currentX();
+  const m = modal(head('Z-reading (end of day)', 'Isasara nito ang benta mula sa huling Z-reading. Hindi na ito mababago.') + zHTML({ ...x, createdAt: Date.now(), by: me.name }, Store.settings, 'Z') + `
+    ${openShift() ? '<span class="pill low" style="align-self:flex-start">Bukas pa ang shift. Mas maganda kung i-close muna.</span>' : ''}
+    ${!x.count && !x.refundCount ? '<span class="pill n" style="align-self:flex-start">Walang benta mula sa huling Z-reading</span>' : ''}
+    <div class="actions"><button class="btn ghost" data-close>Cancel</button><button class="btn" id="zok">Save Z-reading</button></div>`);
+  $('zok').addEventListener('click', async () => {
+    const b = $('zok'); b.disabled = true;
+    const { last, ...rest } = x;
+    const z = { ...rest, id: uid(), to: Date.now(), createdAt: Date.now(), by: me.name };
+    try { await Store.put('zreads', z); closeModal(); toast(`Z No. ${String(z.zNo).padStart(4, '0')} saved`); showZ(z, 'Z'); }
+    catch (e) { b.disabled = false; failed(e); }
+  });
+}
 function shiftAction(a) {
+  if (a === 'xread') return showZ({ ...currentX(), createdAt: Date.now(), by: me.name }, 'X');
+  if (a === 'zread') return runZ();
   const sh = openShift();
   if (a === 'openshift') return amountModal('Open shift', 'Bilangin ang cash sa drawer bago magbenta.', 'Starting cash (₱)', false, async v => { await Store.put('shifts', { id: uid(), openedAt: Date.now(), openedBy: me.name, startCash: v, moves: [], status: 'open', closedAt: null, deviceId }); toast('Shift opened'); });
   if (!sh) return;
@@ -601,11 +651,12 @@ function failed(e) { console.error(e); toast(e && e.name === 'QuotaExceededError
 $('rail').addEventListener('click', e => { const b = e.target.closest('.nav[data-view]'); if (b) go(b.dataset.view); });
 $('mebtn').addEventListener('click', lock);
 document.body.addEventListener('click', e => {
-  const t = e.target.closest('[data-tile],[data-line],[data-cat],[data-rcpt],[data-act],[data-ot]'); if (!t || !me) return;
+  const t = e.target.closest('[data-tile],[data-line],[data-cat],[data-rcpt],[data-act],[data-ot],[data-z]'); if (!t || !me) return;
   if (t.dataset.tile) { const it = itemById(t.dataset.tile); if (!it) return; hasVariants(it) ? pickVariant(it) : addLine(it, null); }
   else if (t.dataset.line) editLine(t.dataset.line);
   else if (t.dataset.cat) { cat = t.dataset.cat; renderSale(); document.querySelector('.gridscroll').scrollTop = 0; }
   else if (t.dataset.rcpt) { const s = sales.find(x => x.id === t.dataset.rcpt); if (s) showReceipt(s); }
+  else if (t.dataset.z) { const z = Store.data.zreads.find(x => x.id === t.dataset.z); if (z) showZ(z, 'Z'); }
   else if (t.dataset.ot) { cart.orderType = t.dataset.ot; saveCart(); renderSale(); }
   else if (t.dataset.act === 'starter') loadStarter(t);
   else shiftAction(t.dataset.act);
