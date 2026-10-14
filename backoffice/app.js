@@ -46,10 +46,18 @@ const ROUTES = {
   'settings': { t: 'Settings' }
 };
 
+let lastErr = 0;
+function cloudError(e, kind) {
+  console.error(kind, e);
+  const c = String((e && (e.code || e.message)) || '');
+  if (!/permission/i.test(c) || Date.now() - lastErr < 30000) return; lastErr = Date.now();
+  toast(kind === 'write' ? 'Tinanggihan ng Firebase ang pag-save (Firestore Rules). Naka-save muna sa device at ipapadala ulit.' : 'Hindi mabasa ang data sa Firebase. Tingnan ang Firestore Rules sa Firebase console.', { ms: 7000 });
+}
+
 /* ================= boot ================= */
 async function boot() {
   catchErrors(); registerSW();
-  Store.onError = e => { if (/permission/i.test((e && (e.code || e.message)) || '')) toast('Hindi ma-save sa cloud (permission). Mag-sign in ulit.'); else console.error(e); };
+  Store.onError = cloudError;
   await Store.init();
   let raf = 0;
   Store.on(ch => {
@@ -71,7 +79,8 @@ function header() {
   $('acctav').textContent = (name || '?').charAt(0).toUpperCase(); $('acctname').textContent = name;
   const st = $('status'), cloud = Store.mode === 'cloud';
   st.className = 'status' + (cloud && !Store.online ? ' off' : '');
-  st.querySelector('span').textContent = cloud ? (Store.online ? 'Synced' : 'Offline – will sync') : 'Saved on this device';
+  st.className = 'status' + (cloud && (!Store.online || Store.pending) ? ' off' : '');
+  st.querySelector('span').textContent = cloud ? (!Store.online ? 'Offline – will sync' : Store.pending ? `${Store.pending} hindi pa naka-sync` : 'Synced') : 'Saved on this device';
 }
 
 /* ================= routing ================= */
@@ -467,8 +476,9 @@ function pEmployees(b) {
 function editEmployee(e) {
   const isNew = !e; e = e || { id: uid(), name: '', role: 'cashier', active: true, createdAt: Date.now() }; let role = e.role, active = e.active !== false;
   const owner = e.role === 'owner';
+  const canOwner = !owner && !Store.data.employees.some(x => x.role === 'owner' && x.active !== false);
   const m = modal(head(isNew ? 'New employee' : 'Edit employee') + `<div class="field"><label for="en">Name</label><input id="en" maxlength="30" value="${esc(e.name)}"></div>
-    ${owner ? `<div class="sub">Role: <b>Owner</b></div>` : `<div class="field"><span class="flabel">Role</span><div class="chips" id="er"><button type="button" data-r="manager" aria-pressed="${role === 'manager'}">Manager</button><button type="button" data-r="cashier" aria-pressed="${role === 'cashier'}">Cashier</button></div></div>`}
+    ${owner ? `<div class="sub">Role: <b>Owner</b></div>` : `<div class="field"><span class="flabel">Role</span><div class="chips" id="er">${canOwner ? `<button type="button" data-r="owner" aria-pressed="${role === 'owner'}">Owner</button>` : ''}<button type="button" data-r="manager" aria-pressed="${role === 'manager'}">Manager</button><button type="button" data-r="cashier" aria-pressed="${role === 'cashier'}">Cashier</button></div></div>`}
     <div class="field"><label for="ep">POS PIN (4 digits)${isNew ? '' : ' · iwanang blank para hindi palitan'}</label><input id="ep" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••"></div>
     ${owner ? '' : `<div class="toggle"><span>Active<div class="sub">Ang inactive ay hindi makaka-login sa POS</div></span><button type="button" class="switch" role="switch" id="ea" aria-checked="${active}" aria-label="Active"></button></div>`}
     <div class="err" id="eerr" hidden></div>

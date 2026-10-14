@@ -63,14 +63,19 @@ export const Store = {
   data: { items: [], sales: [], shifts: [], tickets: [], employees: [], discounts: [] },
   settings: { ...DEFAULT_SETTINGS },
   account: null,
-  onError: e => console.error(e),
+  pending: (lsGet('outbox') || []).length, // cloud writes waiting to be accepted
+  onError: (e, kind) => console.error(kind, e),
   on(fn) { listeners.add(fn); return () => listeners.delete(fn); },
 
   async init() {
     addEventListener('online', () => { Store.online = true; emit('net'); });
     addEventListener('offline', () => { Store.online = false; emit('net'); });
     try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
-    if (Store.mode === 'cloud') await Cloud.init(); else await Local.init();
+    if (Store.mode === 'cloud') {
+      await Cloud.init();
+      addEventListener('online', () => Cloud.flush());
+      setInterval(() => { if (Store.pending) Cloud.flush(); }, 60000);
+    } else await Local.init();
     emit('status');
     return Store.status;
   },
@@ -289,7 +294,7 @@ const Cloud = {
   },
   ref(...p) { return fb.Fs.doc(fb.fs, 'stores', cloudUid, ...p); },
   col(c) { return fb.Fs.collection(fb.fs, 'stores', cloudUid, c); },
-  fail(e) { Store.onError(e); },
+  fail(e) { Store.onError(e, 'read'); },
 
   async init() {
     try { await Cloud.load(); }
@@ -327,15 +332,50 @@ const Cloud = {
     }));
     await Promise.race([Promise.all(firsts), sleep(8000)]);
     Store.status = 'ready';
+    Store.pending = (lsGet('outbox') || []).filter(o => o.uid === cloudUid).length;
+    Cloud.flush();
   },
   detach() { while (unsubs.length) { try { unsubs.pop()(); } catch (e) {} } resetMemory(); },
-  // Writes go to the offline cache at once and sync in the background.
-  write(p) { p.catch(Cloud.fail); return Promise.resolve(); },
-  put(col, obj) { return Cloud.write(fb.Fs.setDoc(Cloud.ref(col, obj.id), stripId(obj))); },
-  patch(col, id, partial) { return Cloud.write(fb.Fs.setDoc(Cloud.ref(col, id), partial, { merge: true })); },
-  del(col, id) { return Cloud.write(fb.Fs.deleteDoc(Cloud.ref(col, id))); },
-  incr(col, id, field, delta) { return Cloud.write(fb.Fs.updateDoc(Cloud.ref(col, id), { [field]: fb.Fs.increment(delta) })); },
-  saveSettings(s) { return Cloud.write(fb.Fs.setDoc(Cloud.ref('meta', 'settings'), s, { merge: true })); },
+  // Writes go to Firestore's offline cache at once and sync in the background.
+  // Every write is also kept in an outbox on this device until the cloud
+  // confirms it. If the cloud rejects a write (e.g. Firestore Rules not published)
+  // or the app closes before it synced, it is sent again later. Nothing is lost.
+  run(o) {
+    const r = Cloud.ref(o.col, o.id);
+    if (o.k === 'set') return fb.Fs.setDoc(r, o.data);
+    if (o.k === 'merge') return fb.Fs.setDoc(r, o.data, { merge: true });
+    if (o.k === 'del') return fb.Fs.deleteDoc(r);
+    return fb.Fs.updateDoc(r, { [o.field]: fb.Fs.increment(o.delta) });
+  },
+  inflight: new Set(),
+  saveQ(fn) {
+    const q = fn(lsGet('outbox') || []).slice(-3000);
+    lsSet('outbox', q); Store.pending = q.filter(o => o.uid === cloudUid).length; emit('net');
+  },
+  op(o, quiet) {
+    o = { ...o, uid: o.uid || cloudUid, oid: o.oid || uid() };
+    // increments are not safe to replay, so they are only kept if the cloud rejects them
+    if (o.k !== 'incr' || o.retry) Cloud.saveQ(q => q.some(x => x.oid === o.oid) ? q : [...q, o]);
+    Cloud.inflight.add(o.oid);
+    Cloud.run(o).then(
+      () => { Cloud.inflight.delete(o.oid); Cloud.saveQ(q => q.filter(x => x.oid !== o.oid)); },
+      e => {
+        Cloud.inflight.delete(o.oid);
+        const err = (e && e.code) || 'error';
+        Cloud.saveQ(q => q.some(x => x.oid === o.oid) ? q.map(x => x.oid === o.oid ? { ...x, err } : x) : [...q, { ...o, retry: true, err }]);
+        if (!quiet) Store.onError(e, 'write');
+      });
+    return Promise.resolve();
+  },
+  flush() {
+    if (!cloudUid || !navigator.onLine) return;
+    (lsGet('outbox') || []).filter(o => o.uid === cloudUid && !Cloud.inflight.has(o.oid)).forEach(o => Cloud.op(o, true));
+  },
+  put(col, obj) { return Cloud.op({ k: 'set', col, id: obj.id, data: stripId(obj) }); },
+  patch(col, id, partial) { return Cloud.op({ k: 'merge', col, id, data: partial }); },
+  del(col, id) { return Cloud.op({ k: 'del', col, id }); },
+  incr(col, id, field, delta) { return Cloud.op({ k: 'incr', col, id, field, delta }); },
+  saveSettings(s) { return Cloud.op({ k: 'merge', col: 'meta', id: 'settings', data: s }); },
   watchSales(from, to, cb) {
     const { onSnapshot, query, where } = fb.Fs; const col = Cloud.col('sales');
     const range = f => to === Infinity ? query(col, where(f, '>=', from)) : query(col, where(f, '>=', from), where(f, '<', to));
@@ -359,14 +399,12 @@ const Cloud = {
     let cred;
     try { cred = await fb.Au.createUserWithEmailAndPassword(fb.auth, email.trim(), password); } catch (e) { throw Cloud.authError(e); }
     cloudUid = cred.user.uid;
-    const settings = { ...DEFAULT_SETTINGS, storeName: storeName.trim() || 'Friesta', ownerName: name.trim(), pinSalt: randomHex(8) };
-    const { writeBatch } = fb.Fs; const batch = writeBatch(fb.fs);
-    batch.set(Cloud.ref('meta', 'settings'), settings);
-    const ownerId = uid();
-    const pinHash = await sha256(`friesta-pin:${settings.pinSalt}:${pin}`);
-    batch.set(Cloud.ref('employees', ownerId), { name: name.trim(), role: 'owner', pinHash, active: true, createdAt: Date.now() });
-    DEFAULT_DISCOUNTS.forEach(d => batch.set(Cloud.ref('discounts', d.id), stripId(d)));
-    await batch.commit();
+    // Cloud stores use the default PIN salt so PINs stay valid even if some writes are delayed.
+    const settings = { ...DEFAULT_SETTINGS, storeName: storeName.trim() || 'Friesta', ownerName: name.trim(), pinSalt: '' };
+    const pinHash = await sha256(`friesta-pin:friesta:${pin}`);
+    Cloud.op({ k: 'set', col: 'meta', id: 'settings', data: settings });
+    Cloud.op({ k: 'set', col: 'employees', id: uid(), data: { name: name.trim(), role: 'owner', pinHash, active: true, createdAt: Date.now() } });
+    DEFAULT_DISCOUNTS.forEach(d => Cloud.op({ k: 'set', col: 'discounts', id: d.id, data: stripId(d) }, true));
     await Cloud.attach(cred.user); emit('status');
   },
   async signIn(email, password) {

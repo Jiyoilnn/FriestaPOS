@@ -100,3 +100,14 @@ I-edit o palitan ang files sa GitHub. Makukuha ng app ang bagong version kapag o
 | **Net sales** | Gross sales − Discounts − Refunds |
 | Cost of goods | Cost ng nabenta (mula sa cost na nilagay sa Items) − cost ng ni-refund |
 | **Gross profit** | Net sales − Cost of goods |
+
+## Kapag may problema sa online sync
+
+**"Tinanggihan ng Firebase ang pag-save (Firestore Rules)"**
+Hindi pa naka-publish ang tamang Firestore Rules. Sa Firebase console: **Firestore Database → Rules**, burahin ang lahat ng nandoon, i-paste ang laman ng `firestore.rules`, tapos **Publish**. Hindi nawawala ang benta habang inaayos ito: naka-save muna sa device at kusang ipapadala ulit kapag pinayagan na ng Firebase (makikita sa POS ang "Syncing" na may bilang).
+
+**"Hindi mabasa ang data sa Firebase"**
+Parehong dahilan: i-publish ang Firestore Rules.
+
+**Walang PIN na gumagana sa unang bukas**
+Pindutin ang **Gamitin ang account password** sa PIN screen. Kapag wala pang owner PIN, hihingin ng app na gumawa ng bago.

@@ -25,12 +25,20 @@ let view = 'sale', cat = 'All', bumpId = null, padKey = null;
 let cart = loadCart();
 const deviceId = lsGet('deviceId') || (lsSet('deviceId', uid().slice(-6)), lsGet('deviceId'));
 
+let lastErr = 0;
+function cloudError(e, kind) {
+  console.error(kind, e);
+  const c = String((e && (e.code || e.message)) || '');
+  if (!/permission/i.test(c) || Date.now() - lastErr < 30000) return; lastErr = Date.now();
+  toast(kind === 'write' ? 'Tinanggihan ng Firebase ang pag-save (Firestore Rules). Naka-save muna sa device at ipapadala ulit.' : 'Hindi mabasa ang data sa Firebase. Tingnan ang Firestore Rules sa Firebase console.', { ms: 7000 });
+}
+
 /* ================= boot + routing ================= */
 async function boot() {
   catchErrors(); registerSW(); keepAwake();
   setLogo($('logoimg'));
   Printer.onChange = () => { if (view === 'settings') renderPrinter(); };
-  Store.onError = e => { if (/permission/i.test((e && (e.code || e.message)) || '')) toast('Hindi ma-save sa cloud (permission). Mag-sign in ulit.'); else console.error(e); };
+  Store.onError = cloudError;
   await Store.init();
   Store.on(onChange);
   route();
@@ -77,8 +85,26 @@ function usePassword() {
   const m = modal(head('Owner sign in', esc(Store.account && Store.account.email || '')) + `<form id="pwf" style="display:flex;flex-direction:column;gap:12px"><div class="field"><label for="opw">Account password</label><input id="opw" type="password" autocomplete="current-password"></div><div class="err" id="operr" hidden></div><button class="btn">Unlock</button></form>`, { focus: '#opw' });
   m.querySelector('form').addEventListener('submit', async e => {
     e.preventDefault();
-    try { await Store.signIn(Store.account.email, $('opw').value); closeModal(); unlock({ id: 'account', name: Store.account.name || 'Owner', role: 'owner' }); }
+    try {
+      await Store.signIn(Store.account.email, $('opw').value); closeModal();
+      const owner = Store.data.employees.find(x => x.role === 'owner' && x.active !== false);
+      unlock(owner || { id: 'account', name: Store.account.name || 'Owner', role: 'owner' });
+      if (!owner) setupOwnerPin();
+    }
     catch (x) { $('operr').textContent = 'Mali ang password.'; $('operr').hidden = false; }
+  });
+}
+function setupOwnerPin() {
+  const m = modal(head('Gumawa ng owner PIN', 'Wala pang owner PIN ang tindahang ito. Ito ang gagamitin mo sa PIN screen.') + `
+    <div class="field"><label for="on">Pangalan mo</label><input id="on" maxlength="30" value="${esc(Store.account && Store.account.name || '')}"></div>
+    <div class="field"><label for="op">PIN (4 digits)</label><input id="op" type="password" inputmode="numeric" maxlength="4"></div>
+    <div class="err" id="operr2" hidden></div><button class="btn" id="opsave">Save PIN</button>`, { focus: '#on' });
+  $('opsave').addEventListener('click', async () => {
+    const name = $('on').value.trim(), pin = $('op').value.trim();
+    if (!name || !/^\d{4}$/.test(pin)) { $('operr2').textContent = 'Ilagay ang pangalan at 4-digit PIN.'; $('operr2').hidden = false; return; }
+    const queued = (lsGet('outbox') || []).find(o => o.col === 'employees' && o.data && o.data.role === 'owner');
+    const emp = { id: queued ? queued.id : uid(), name, role: 'owner', pinHash: await Store.pinHash(pin), active: true, createdAt: Date.now() };
+    await Store.put('employees', emp); me = emp; sessionStorage.setItem('friesta:me', emp.id); closeModal(); renderAll(); toast('Na-save ang PIN');
   });
 }
 function unlock(e) {
@@ -136,10 +162,11 @@ function renderAll() {
 }
 function renderSync() {
   const el = $('sync'); const cloud = Store.mode === 'cloud';
-  const label = cloud ? (Store.online ? 'Synced' : 'Offline') : 'Offline OK';
-  el.className = 'syncdot' + (cloud && !Store.online ? ' off' : '');
+  const n = Store.pending;
+  const label = cloud ? (!Store.online ? 'Offline' : n ? `Syncing ${n}` : 'Synced') : 'Offline OK';
+  el.className = 'syncdot' + (cloud && (!Store.online || n) ? ' off' : '');
   el.querySelector('span').textContent = label;
-  $('msync').textContent = '● ' + (cloud ? (Store.online ? 'Synced' : 'Offline · will sync later') : 'Works offline');
+  $('msync').textContent = '● ' + (cloud ? (!Store.online ? `Offline · ${n ? n + ' naghihintay i-sync' : 'magsi-sync mamaya'}` : n ? `${n} hindi pa naka-sync` : 'Synced') : 'Works offline');
 }
 function renderMe() {
   $('meav').textContent = (me.name || '?').trim().charAt(0).toUpperCase();
