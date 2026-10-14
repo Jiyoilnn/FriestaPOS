@@ -76,7 +76,7 @@ Gamitin ito kung nasa tablet sa tindahan ang POS at gusto mong makita ang report
 7. Sa Firebase **Authentication → Settings → Authorized domains**, idagdag ang **`jiyoilnn.github.io`**.
 8. Buksan ulit ang POS (online). Gumawa ng account (o mag-sign in). Sa ibang device, mag-sign in gamit ang parehong email at password.
 
-**Paglipat ng data mula offline papuntang online:** bago i-on ang sync, mag-**Download backup** sa Back Office. Pagkatapos i-on at mag-sign in, **Restore backup**.
+**Paglipat ng data mula offline papuntang online:** buksan ang Back Office sa device na may offline data, mag-sign in sa online account, tapos **Settings → Import to cloud**. (Puwede ring Download backup / Restore backup.) I-add ulit ang employees at PIN sa Employees & PIN.
 
 > Ligtas na i-commit ang Firebase web config; ang proteksyon ay galing sa `firestore.rules` (tanging ang may-ari ng account ang makakabasa at makakasulat ng data ng tindahan).
 

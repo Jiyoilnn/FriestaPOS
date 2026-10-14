@@ -126,6 +126,17 @@ export function normaliseBackup(d) {
   };
 }
 
+/* Read whatever offline-mode data exists on this device (used to move it to the cloud). */
+export async function readLocalData() {
+  try { if (indexedDB.databases) { const dbs = await indexedDB.databases(); if (!dbs.some(d => d.name === 'friesta')) return null; } } catch (e) {}
+  try {
+    if (!Local.db) await Local.open();
+    const out = {}; for (const c of COLS) out[c] = await Local.getAll(c);
+    const s = await Local.get('meta', 'settings'); out.settings = s ? stripId(s) : {};
+    return out;
+  } catch (e) { return null; }
+}
+
 /* ======================================================================
    LOCAL BACKEND — IndexedDB, one object store per collection
    ====================================================================== */

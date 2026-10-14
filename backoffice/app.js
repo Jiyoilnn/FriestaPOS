@@ -1,5 +1,5 @@
 // Friesta Back Office — reports, items, discounts, employees, settings.
-import { Store, STARTER_ITEMS, normaliseBackup } from '../shared/store.js';
+import { Store, STARTER_ITEMS, normaliseBackup, readLocalData } from '../shared/store.js';
 import { $, esc, uid, r2, pad3, peso, peso0, pesoShort, dayStart, addDays, addMonths, monthStart, weekStart, fmtTime, fmtDT, isoDate, lsGet, lsSet, toast, modal, closeModal, modalOpen, Modal, head, armed, ICON, registerSW, catchErrors, toCSV, download } from '../shared/util.js';
 import { renderGate } from '../shared/auth-ui.js';
 import * as M from '../shared/metrics.js';
@@ -512,9 +512,11 @@ function pSettings(b) {
       ${cloud ? `<div class="sub">Naka-on ang <b>cloud sync</b>. Makikita mo ang benta mula sa kahit anong device na naka-sign in sa account na ito. Gumagana pa rin offline; magsi-sync pagbalik ng internet.</div>`
       : `<div class="sub"><b>Offline mode.</b> Naka-save ang lahat sa device na ito. Kung bubuksan mo ang POS at Back Office sa parehong device, pareho ang data. Para makita ang benta mula sa ibang phone (hal. sa bahay), i-on ang libreng cloud sync: sundan ang <b>docs/SETUP.md</b> sa repository.</div>`}
     </div>
+    ${cloud ? '<div id="localimp"></div>' : ''}
     <div class="card form"><div class="flabel">Backup</div>
       <div class="sub">I-download ang backup linggo-linggo at itago sa Google Drive o Messenger. Puwede ring i-restore dito ang backup mula sa lumang Friesta POS.</div>
       <div class="actions"><button class="btn ghost" id="bkp">${ICON.download} Download backup</button><label class="btn ghost" style="cursor:pointer">Restore backup<input type="file" id="rst" accept="application/json,.json" hidden></label></div></div>`;
+  if (cloud && !lsGet('localImported')) offerLocalImport();
   const on = id => $(id).getAttribute('aria-checked') === 'true';
   b.querySelectorAll('#stf .switch').forEach(x => x.addEventListener('click', () => x.setAttribute('aria-checked', x.getAttribute('aria-checked') !== 'true')));
   $('stf').addEventListener('submit', async e => { e.preventDefault(); await Store.saveSettings({ storeName: $('sn').value.trim() || 'Friesta', address: $('sa').value.trim(), footer: $('sf').value.trim(), askOrderType: on('s-ot'), requireShift: on('s-rs'), refundNeedsManager: on('s-rm') }); document.activeElement.blur(); toast('Na-save ang settings'); });
@@ -532,6 +534,24 @@ function pSettings(b) {
       <span class="pill low" style="align-self:flex-start">${cloud ? 'Idadagdag ang laman ng backup sa cloud' : 'Papalitan nito ang lahat ng data sa device na ito'}</span>
       <div class="actions"><button class="btn ghost" data-close>Cancel</button><button class="btn danger" id="rsok">Restore</button></div>`);
     $('rsok').addEventListener('click', async () => { $('rsok').disabled = true; try { await Store.replaceAll(ds); closeModal(); toast('Na-restore ang backup'); } catch (e) { console.error(e); toast('Hindi na-restore. Subukan ulit.'); $('rsok').disabled = false; } });
+  });
+}
+
+async function offerLocalImport() {
+  const d = await readLocalData(); const host = $('localimp');
+  if (!host || !d) return;
+  const n = { items: d.items.length, sales: d.sales.length, shifts: d.shifts.length };
+  if (!n.items && !n.sales && !n.shifts) return;
+  host.innerHTML = `<div class="card form" style="border-color:var(--c1)"><div class="flabel">May data mula sa offline mode</div>
+    <div class="sub num">Sa device na ito: ${n.items} items · ${n.sales} receipts · ${n.shifts} shifts. Ilipat ito sa cloud para makita sa lahat ng device. Hindi kasama ang employees at PIN; i-add ulit sila sa Employees & PIN.</div>
+    <div class="actions"><button class="btn" id="limp">Import to cloud</button></div></div>`;
+  $('limp').addEventListener('click', async () => {
+    const btn = $('limp'); btn.disabled = true; btn.textContent = 'Importing…';
+    try {
+      const { pinSalt, ...settings } = d.settings || {};
+      await Store.replaceAll({ items: d.items, sales: d.sales, shifts: d.shifts, tickets: d.tickets, discounts: d.discounts, employees: null, settings });
+      lsSet('localImported', Date.now()); host.innerHTML = ''; toast(`Nailipat sa cloud: ${n.items} items, ${n.sales} receipts`);
+    } catch (e) { console.error(e); btn.disabled = false; btn.textContent = 'Import to cloud'; toast('Hindi natuloy. Siguraduhing may internet, tapos subukan ulit.'); }
   });
 }
 

@@ -18,7 +18,14 @@
 //   appId: "1:1234567890:web:abc123"
 // };
 
-export const FIREBASE_CONFIG = null;
+export const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyD2BqHHoOjKAMteIUvksKJMpy4KzqxD6zw",
+  authDomain: "friesta-pos.firebaseapp.com",
+  projectId: "friesta-pos",
+  storageBucket: "friesta-pos.firebasestorage.app",
+  messagingSenderId: "555938165674",
+  appId: "1:555938165674:web:7b1ae49bcda82964d9b1d3"
+};
 
 // Firebase JS SDK version loaded from Google's CDN when cloud sync is on.
 export const FIREBASE_VERSION = "10.12.2";
