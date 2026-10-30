@@ -101,6 +101,12 @@ tr.click:hover td{background:var(--surface-2)}
 
 .vrow{display:grid;grid-template-columns:1fr 100px 100px 40px;gap:8px;align-items:center}
 .vrow input{height:44px;padding:0 12px;border-radius:12px;border:2px solid var(--line);background:var(--bg);width:100%;min-width:0}
+.catgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.opt{font-weight:700;text-transform:none;letter-spacing:0;opacity:.75}
+.field input:disabled{opacity:.5}
+.list>.it.tree.l2{padding-left:30px}
+.list>.it.tree.l3{padding-left:58px}
+.branch{width:16px;height:26px;margin-top:-16px;flex:none;border-left:2px solid var(--line-2);border-bottom:2px solid var(--line-2);border-bottom-left-radius:8px}
 .vhead{display:grid;grid-template-columns:1fr 100px 100px 40px;gap:8px;font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 
 @media (max-width:1100px){ .kpistrip{grid-template-columns:repeat(3,minmax(0,1fr))} }

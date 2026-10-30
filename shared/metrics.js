@@ -56,7 +56,8 @@ export function byItem(sales, from, to, pred = () => true, itemsById = {}) {
   const m = new Map();
   const row = l => {
     const k = (l.itemId || l.name) + '|' + (l.variant || '');
-    if (!m.has(k)) m.set(k, { name: l.name, variant: l.variant || '', category: l.category || (itemsById[l.itemId] && itemsById[l.itemId].category) || 'Other', sold: 0, refundedQty: 0, gross: 0, discounts: 0, refunds: 0, cogs: 0 });
+    const it = itemsById[l.itemId];
+    if (!m.has(k)) m.set(k, { name: l.name, variant: l.variant || '', category: l.category || (it && it.category) || 'Other', sub: ('sub' in l ? l.sub : it && it.sub) || '', sub2: ('sub2' in l ? l.sub2 : it && it.sub2) || '', sold: 0, refundedQty: 0, gross: 0, discounts: 0, refunds: 0, cogs: 0 });
     return m.get(k);
   };
   for (const s of sales) {
@@ -66,12 +67,21 @@ export function byItem(sales, from, to, pred = () => true, itemsById = {}) {
   }
   return [...m.values()].map(r => { const net = r.gross - r.discounts - r.refunds; return { ...r, net, profit: net - r.cogs }; }).sort((a, b) => b.net - a.net);
 }
-export function byCategory(sales, from, to, pred, itemsById) {
+// level 1 = category, 2 = category › subcategory, 3 = … › sub-subcategory.
+// Items with no name at a level are grouped as "Other" under their parent.
+export const catPath = (r, level = 3) => {
+  const p = [r.category || 'Other'];
+  if (level >= 2) p.push(r.sub || 'Other');
+  if (level >= 3 && r.sub) p.push(r.sub2 || 'Other');
+  return p;
+};
+export function byCategory(sales, from, to, pred, itemsById, level = 1) {
   const m = new Map();
   for (const r of byItem(sales, from, to, pred, itemsById)) {
-    const c = m.get(r.category) || { name: r.category, sold: 0, refundedQty: 0, gross: 0, discounts: 0, refunds: 0, net: 0, cogs: 0, profit: 0 };
+    const key = catPath(r, level).join(' › ');
+    const c = m.get(key) || { name: key, sold: 0, refundedQty: 0, gross: 0, discounts: 0, refunds: 0, net: 0, cogs: 0, profit: 0 };
     ['sold', 'refundedQty', 'gross', 'discounts', 'refunds', 'net', 'cogs', 'profit'].forEach(k => c[k] += r[k]);
-    m.set(r.category, c);
+    m.set(key, c);
   }
   return [...m.values()].sort((a, b) => b.net - a.net);
 }

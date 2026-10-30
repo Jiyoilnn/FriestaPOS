@@ -22,7 +22,11 @@ document.querySelectorAll('[data-ic]').forEach(el => { el.outerHTML = ICON[el.da
 let me = null;            // employee using the POS
 let sales = [];           // last 14 days (+ refunds), live
 let unwatch = null;
-let view = 'sale', cat = 'All', bumpId = null, padKey = null;
+let view = 'sale', bumpId = null, padKey = null;
+// Menu filter: category → subcategory → sub-subcategory. null = all at that level, '' = items with no name at that level.
+let sel = (() => { const s = lsGet('menuSel'); return s && 'cat' in s ? s : { cat: null, sub: null, sub2: null }; })();
+const catOf = i => i.category || 'Other', subOf = i => i.sub || '', sub2Of = i => i.sub2 || '';
+const uniq = a => [...new Set(a)];
 let cart = loadCart();
 const deviceId = lsGet('deviceId') || (lsSet('deviceId', uid().slice(-6)), lsGet('deviceId'));
 
@@ -123,7 +127,7 @@ function bumpIdle() {
 function showApp() {
   $('app').hidden = false;
   $('bolink').hidden = !isMgr(me);
-  renderAll();
+  renderAll(); revealMenu();
 }
 
 /* ================= cart (kept on the device so a reload never loses an order) ================= */
@@ -134,7 +138,7 @@ function addLine(it, variant) {
   const vname = variant ? variant.name : '';
   const price = +(variant ? variant.price : it.price) || 0, cost = +(variant ? variant.cost : it.cost) || 0;
   const ex = cart.lines.find(l => l.itemId === it.id && l.variant === vname && !l.note && l.price === price);
-  if (ex) ex.qty++; else cart.lines.push({ key: uid(), itemId: it.id, name: it.name, variant: vname, category: it.category || 'Other', price, cost, qty: 1, note: '' });
+  if (ex) ex.qty++; else cart.lines.push({ key: uid(), itemId: it.id, name: it.name, variant: vname, category: catOf(it), sub: subOf(it), sub2: sub2Of(it), price, cost, qty: 1, note: '' });
   if (tracked(it)) { const n = cart.lines.filter(l => l.itemId === it.id).reduce((a, l) => a + l.qty, 0); if (n > +it.stock) toast(`${Math.max(0, +it.stock)} na lang ang stock ng ${it.name}`); }
   saveCart(); renderSale(it.id);
 }
@@ -181,15 +185,52 @@ function renderMe() {
 }
 
 /* ================= SALE ================= */
+// Up to three rows of buttons: categories, then the chosen category's subcategories,
+// then the chosen subcategory's sub-subcategories. A row only shows when it has names.
+function renderMenuRows(items) {
+  const chip = (lv, v, label, on, all) => `<button class="cat" data-lv="${lv}"${all ? ' data-all="1"' : ` data-v="${esc(v)}"`} aria-pressed="${on}">${esc(label)}</button>`;
+  const cats = uniq(items.map(catOf));
+  if (sel.cat !== null && !cats.includes(sel.cat)) sel = { cat: null, sub: null, sub2: null };
+  $('cats').innerHTML = items.length ? chip(1, '', 'All', sel.cat === null, true) + cats.map(c => chip(1, c, c, c === sel.cat)).join('') : '';
+  let row2 = "", row3 = "";
+  if (sel.cat !== null) {
+    const inCat = items.filter(i => catOf(i) === sel.cat), subs = uniq(inCat.map(subOf)), named = subs.filter(Boolean);
+    if (named.length) {
+      if (sel.sub !== null && !subs.includes(sel.sub)) { sel.sub = null; sel.sub2 = null; }
+      row2 = `<span class="crumb">${esc(sel.cat)} ›</span>` + chip(2, '', 'All', sel.sub === null, true) + named.map(s => chip(2, s, s, s === sel.sub)).join('') + (subs.includes('') ? chip(2, '', 'Other', sel.sub === '') : '');
+      if (sel.sub) {
+        const inSub = inCat.filter(i => subOf(i) === sel.sub), s2s = uniq(inSub.map(sub2Of)), named2 = s2s.filter(Boolean);
+        if (named2.length) {
+          if (sel.sub2 !== null && !s2s.includes(sel.sub2)) sel.sub2 = null;
+          row3 = `<span class="crumb">${esc(sel.sub)} ›</span>` + chip(3, '', 'All', sel.sub2 === null, true) + named2.map(s => chip(3, s, s, s === sel.sub2)).join('') + (s2s.includes('') ? chip(3, '', 'Other', sel.sub2 === '') : '');
+        } else sel.sub2 = null;
+      } else sel.sub2 = null;
+    } else { sel.sub = null; sel.sub2 = null; }
+  }
+  $('cats2').innerHTML = row2; $('cats2').hidden = !row2;
+  $('cats3').innerHTML = row3; $('cats3').hidden = !row3;
+}
+function pickMenu(lv, v) {
+  if (lv === 1) sel = { cat: v, sub: null, sub2: null };
+  else if (lv === 2) sel = { ...sel, sub: v !== null && v === sel.sub ? null : v, sub2: null };   // tap again to go back to All
+  else sel = { ...sel, sub2: v !== null && v === sel.sub2 ? null : v };
+  lsSet('menuSel', sel); renderSale();
+  document.querySelector('.gridscroll').scrollTop = 0;
+  revealMenu();
+}
+// Keep the chosen button of each row in view (rows scroll sideways on phones).
+function revealMenu() {
+  ['cats', 'cats2', 'cats3'].forEach(id => { const row = $(id), on = row && row.querySelector('[aria-pressed="true"]'); if (on && !row.hidden) row.scrollLeft = Math.max(0, on.offsetLeft - row.offsetLeft - (row.clientWidth - on.offsetWidth) / 2); });
+}
 function sortedItems() { return Store.data.items.filter(i => i.active !== false); }
 function renderSale(bump) {
   if (bump) bumpId = bump;
   const items = sortedItems();
-  const cats = ['All', ...new Set(items.map(i => i.category || 'Other'))]; if (!cats.includes(cat)) cat = 'All';
-  $('cats').innerHTML = items.length ? cats.map(c => `<button class="cat" aria-pressed="${c === cat}" data-cat="${esc(c)}">${esc(c)}</button>`).join('') : '';
+  renderMenuRows(items);
   const q = $('q').value.trim().toLowerCase();
   const qty = {}; cart.lines.forEach(l => qty[l.itemId] = (qty[l.itemId] || 0) + l.qty);
-  const list = items.filter(i => q ? (i.name.toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q)) : (cat === 'All' || (i.category || 'Other') === cat));
+  const inSel = i => (sel.cat === null || catOf(i) === sel.cat) && (sel.sub === null || subOf(i) === sel.sub) && (sel.sub2 === null || sub2Of(i) === sel.sub2);
+  const list = items.filter(i => q ? [i.name, catOf(i), subOf(i), sub2Of(i)].some(t => t.toLowerCase().includes(q)) : inSel(i));
   const grid = $('grid');
   if (!items.length) {
     grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><h3>Wala pang menu</h3><p>${isMgr(me) ? 'Mag-add ng items sa Back Office, o simulan sa sample fries menu (puwedeng i-edit).' : 'Pakisabi sa owner na mag-add ng items sa Back Office.'}</p>${isMgr(me) ? `<div class="actions" style="justify-content:center"><button class="btn" data-act="starter">Use starter menu</button><a class="btn ghost" href="../backoffice/#items">Open Back Office</a></div>` : ''}</div>`;
@@ -350,7 +391,7 @@ function openCharge() {
     const sale = {
       id: uid(), ...nextReceiptNo(),
       orderNo: nextOrderNo(), ts: now.getTime(), orderType: Store.settings.askOrderType ? cart.orderType : '', name: cart.name || '',
-      lines: cart.lines.map(({ itemId, name, variant, category, price, cost, qty, note }) => ({ itemId, name, variant, category: category || 'Other', price, cost: +cost || 0, qty, note })),
+      lines: cart.lines.map(({ itemId, name, variant, category, sub, sub2, price, cost, qty, note }) => ({ itemId, name, variant, category: category || 'Other', sub: sub || '', sub2: sub2 || '', price, cost: +cost || 0, qty, note })),
       subtotal: t.subtotal, discount: t.discount, discountLabel: t.discount ? cart.disc.label : '', total: t.total,
       method, tendered: tend, change: method === 'Cash' ? r2(tend - t.total) : 0, ref: method === 'Cash' ? '' : $('pref').value.trim(),
       status: 'paid', shiftId: sh ? sh.id : null, employeeId: me.id, employeeName: me.name, deviceId
@@ -651,10 +692,10 @@ function failed(e) { console.error(e); toast(e && e.name === 'QuotaExceededError
 $('rail').addEventListener('click', e => { const b = e.target.closest('.nav[data-view]'); if (b) go(b.dataset.view); });
 $('mebtn').addEventListener('click', lock);
 document.body.addEventListener('click', e => {
-  const t = e.target.closest('[data-tile],[data-line],[data-cat],[data-rcpt],[data-act],[data-ot],[data-z]'); if (!t || !me) return;
+  const t = e.target.closest('[data-tile],[data-line],[data-lv],[data-rcpt],[data-act],[data-ot],[data-z]'); if (!t || !me) return;
   if (t.dataset.tile) { const it = itemById(t.dataset.tile); if (!it) return; hasVariants(it) ? pickVariant(it) : addLine(it, null); }
   else if (t.dataset.line) editLine(t.dataset.line);
-  else if (t.dataset.cat) { cat = t.dataset.cat; renderSale(); document.querySelector('.gridscroll').scrollTop = 0; }
+  else if (t.dataset.lv) pickMenu(+t.dataset.lv, t.dataset.all ? null : t.dataset.v);
   else if (t.dataset.rcpt) { const s = sales.find(x => x.id === t.dataset.rcpt); if (s) showReceipt(s); }
   else if (t.dataset.z) { const z = Store.data.zreads.find(x => x.id === t.dataset.z); if (z) showZ(z, 'Z'); }
   else if (t.dataset.ot) { cart.orderType = t.dataset.ot; saveCart(); renderSale(); }

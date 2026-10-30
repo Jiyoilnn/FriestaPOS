@@ -132,3 +132,19 @@ Sa **Back Office → Settings**, ilagay din ang **Registered business name**, **
 Makikita lahat ng Z-reading sa **Back Office → Z-readings**, na may CSV download.
 
 > Paalala: ang X/Z-reading at sunod-sunod na numero ay bahagi lang ng hinihingi ng BIR. Kung balak mong ipa-accredit o ipa-register ang Friesta POS, kumonsulta sa RDO o accountant mo para sa kumpletong requirements.
+
+## Category, subcategory at sub-subcategory
+
+Sa POS, may hanggang **tatlong hilera ng buttons** sa itaas ng menu:
+
+1. **Category**, hal. *Fries*, *Drinks*, *Add-ons*
+2. **Subcategory** ng napiling category, hal. *Fries › Classic, Flavored*
+3. **Sub-subcategory** ng napiling subcategory, hal. *Flavored › Cheesy, Smoky*
+
+Lumalabas lang ang hilera 2 at 3 kapag may laman. Pindutin ulit ang napiling button para bumalik sa **All**. Naaalala ng POS ang huling napili kahit i-reload. Kasama rin sa search ang mga pangalan ng subcategory.
+
+**Paano mag-set up:** Back Office → **Item list** → buksan ang item → punan ang **Category**, **Subcategory** at **Sub-subcategory**. May mga suggestion habang nagta-type.
+
+**Categories page:** makikita ang buong puno (tree). Puwedeng palitan ang pangalan sa kahit anong level, palitan ang kulay ng buong category, o tanggalin ang subcategory (mananatili ang mga item sa parent).
+
+**Sales by category:** pumili ng **Category / Subcategory / Sub-subcategory** para makita ang benta sa bawat level. Ang mga item na walang subcategory ay nasa "Other".

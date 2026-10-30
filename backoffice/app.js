@@ -277,17 +277,20 @@ function pByItem(b) {
   const T = rows.reduce((a, r) => { ['sold', 'refundedQty', 'gross', 'discounts', 'refunds', 'net', 'cogs', 'profit'].forEach(k => a[k] = (a[k] || 0) + r[k]); return a; }, {});
   b.innerHTML = bars(rows) + `<div class="card"><div class="secthead"><h3>Items</h3><button class="btn ghost sm" id="csv">${ICON.download} Download CSV</button></div>
     <div class="tblwrap"><table class="tbl"><thead><tr><th>Item</th><th>Category</th><th class="r">Items sold</th><th class="r">Gross sales</th><th class="r">Items refunded</th><th class="r">Refunds</th><th class="r">Discounts</th><th class="r">Net sales</th><th class="r">Cost of goods</th><th class="r">Gross profit</th><th class="r">Margin</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><td class="t1">${esc(r.label)}</td><td>${esc(r.category)}</td><td class="r num">${r.sold}</td><td class="r num">${peso(r.gross)}</td><td class="r num">${r.refundedQty}</td><td class="r num">${peso(r.refunds)}</td><td class="r num">${peso(r.discounts)}</td><td class="r num">${peso(r.net)}</td><td class="r num">${peso(r.cogs)}</td><td class="r num">${peso(r.profit)}</td><td class="r num">${r.net ? pct(r.profit / r.net) : '—'}</td></tr>`).join('') || `<tr><td colspan="11" class="sub">Walang benta sa panahong ito</td></tr>`}</tbody>
+    <tbody>${rows.map(r => `<tr><td class="t1">${esc(r.label)}</td><td>${esc([r.category, r.sub, r.sub2].filter(Boolean).join(' › '))}</td><td class="r num">${r.sold}</td><td class="r num">${peso(r.gross)}</td><td class="r num">${r.refundedQty}</td><td class="r num">${peso(r.refunds)}</td><td class="r num">${peso(r.discounts)}</td><td class="r num">${peso(r.net)}</td><td class="r num">${peso(r.cogs)}</td><td class="r num">${peso(r.profit)}</td><td class="r num">${r.net ? pct(r.profit / r.net) : '—'}</td></tr>`).join('') || `<tr><td colspan="11" class="sub">Walang benta sa panahong ito</td></tr>`}</tbody>
     ${rows.length ? `<tfoot><tr><td colspan="2">Total</td><td class="r num">${T.sold}</td><td class="r num">${peso(T.gross)}</td><td class="r num">${T.refundedQty}</td><td class="r num">${peso(T.refunds)}</td><td class="r num">${peso(T.discounts)}</td><td class="r num">${peso(T.net)}</td><td class="r num">${peso(T.cogs)}</td><td class="r num">${peso(T.profit)}</td><td class="r num">${T.net ? pct(T.profit / T.net) : '—'}</td></tr></tfoot>` : ''}</table></div></div>`;
-  $('csv').addEventListener('click', () => csvOut('sales-by-item', [['Item', 'Size', 'Category', 'Items sold', 'Gross sales', 'Items refunded', 'Refunds', 'Discounts', 'Net sales', 'Cost of goods', 'Gross profit'], ...rows.map(r => [r.name, r.variant, r.category, r.sold, r2(r.gross), r.refundedQty, r2(r.refunds), r2(r.discounts), r2(r.net), r2(r.cogs), r2(r.profit)])]));
+  $('csv').addEventListener('click', () => csvOut('sales-by-item', [['Item', 'Size', 'Category', 'Subcategory', 'Sub-subcategory', 'Items sold', 'Gross sales', 'Items refunded', 'Refunds', 'Discounts', 'Net sales', 'Cost of goods', 'Gross profit'], ...rows.map(r => [r.name, r.variant, r.category, r.sub, r.sub2, r.sold, r2(r.gross), r.refundedQty, r2(r.refunds), r2(r.discounts), r2(r.net), r2(r.cogs), r2(r.profit)])]));
 }
+let catLevel = 1;
+const LEVELS = ['Category', 'Subcategory', 'Sub-subcategory'];
 function pByCategory(b) {
   const byId = Object.fromEntries(Store.data.items.map(i => [i.id, i]));
-  const rows = M.byCategory(sales, range.from, range.to, empPred(), byId);
-  b.innerHTML = bars(rows) + `<div class="card"><div class="secthead"><h3>Categories</h3><button class="btn ghost sm" id="csv">${ICON.download} Download CSV</button></div>
-    <div class="tblwrap"><table class="tbl"><thead><tr><th>Category</th><th class="r">Items sold</th><th class="r">Gross sales</th><th class="r">Items refunded</th><th class="r">Refunds</th><th class="r">Discounts</th><th class="r">Net sales</th><th class="r">Cost of goods</th><th class="r">Gross profit</th></tr></thead>
+  const rows = M.byCategory(sales, range.from, range.to, empPred(), byId, catLevel);
+  b.innerHTML = bars(rows) + `<div class="card"><div class="secthead"><h3>${LEVELS[catLevel - 1]}</h3><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><div class="seg" id="clv">${LEVELS.map((l, k) => `<button data-l="${k + 1}" aria-pressed="${catLevel === k + 1}">${l}</button>`).join('')}</div><button class="btn ghost sm" id="csv">${ICON.download} Download CSV</button></div></div>
+    <div class="tblwrap"><table class="tbl"><thead><tr><th>${LEVELS[catLevel - 1]}</th><th class="r">Items sold</th><th class="r">Gross sales</th><th class="r">Items refunded</th><th class="r">Refunds</th><th class="r">Discounts</th><th class="r">Net sales</th><th class="r">Cost of goods</th><th class="r">Gross profit</th></tr></thead>
     <tbody>${rows.map(r => `<tr><td class="t1">${esc(r.name)}</td><td class="r num">${r.sold}</td><td class="r num">${peso(r.gross)}</td><td class="r num">${r.refundedQty}</td><td class="r num">${peso(r.refunds)}</td><td class="r num">${peso(r.discounts)}</td><td class="r num">${peso(r.net)}</td><td class="r num">${peso(r.cogs)}</td><td class="r num">${peso(r.profit)}</td></tr>`).join('') || `<tr><td colspan="9" class="sub">Walang benta sa panahong ito</td></tr>`}</tbody></table></div></div>`;
-  $('csv').addEventListener('click', () => csvOut('sales-by-category', [['Category', 'Items sold', 'Gross sales', 'Items refunded', 'Refunds', 'Discounts', 'Net sales', 'Cost of goods', 'Gross profit'], ...rows.map(r => [r.name, r.sold, r2(r.gross), r.refundedQty, r2(r.refunds), r2(r.discounts), r2(r.net), r2(r.cogs), r2(r.profit)])]));
+  b.querySelectorAll('[data-l]').forEach(x => x.addEventListener('click', () => { catLevel = +x.dataset.l; refreshBody(); }));
+  $('csv').addEventListener('click', () => csvOut('sales-by-' + LEVELS[catLevel - 1].toLowerCase(), [[LEVELS[catLevel - 1], 'Items sold', 'Gross sales', 'Items refunded', 'Refunds', 'Discounts', 'Net sales', 'Cost of goods', 'Gross profit'], ...rows.map(r => [r.name, r.sold, r2(r.gross), r.refundedQty, r2(r.refunds), r2(r.discounts), r2(r.net), r2(r.cogs), r2(r.profit)])]));
 }
 function pByEmployee(b) {
   const rows = M.byEmployee(sales, range.from, range.to);
@@ -372,7 +375,7 @@ function pShifts(b) {
 let itemQ = '', itemCat = '', itemStock = 'all';
 function pItems(b) {
   const items = Store.data.items, cats = [...new Set(items.map(i => i.category || 'Other'))].sort();
-  const list = items.filter(i => (!itemQ || i.name.toLowerCase().includes(itemQ)) && (!itemCat || (i.category || 'Other') === itemCat) && (itemStock === 'all' || (itemStock === 'low' ? tracked(i) && +i.stock <= (+i.lowAt || 5) : tracked(i) && +i.stock <= 0)));
+  const list = items.filter(i => (!itemQ || [i.name, i.category, i.sub, i.sub2].some(t => (t || '').toLowerCase().includes(itemQ))) && (!itemCat || (i.category || 'Other') === itemCat) && (itemStock === 'all' || (itemStock === 'low' ? tracked(i) && +i.stock <= (+i.lowAt || 5) : tracked(i) && +i.stock <= 0)));
   const priceTxt = i => hasVariants(i) ? (() => { const ps = i.variants.map(v => +v.price); const lo = Math.min(...ps), hi = Math.max(...ps); return lo === hi ? peso(lo) : `${peso(lo)} – ${peso(hi)}`; })() : peso(i.price);
   const costTxt = i => hasVariants(i) ? (() => { const cs = i.variants.map(v => +v.cost || 0); const lo = Math.min(...cs), hi = Math.max(...cs); return lo === hi ? peso(lo) : `${peso(lo)} – ${peso(hi)}`; })() : peso(i.cost || 0);
   const margin = i => { const p = hasVariants(i) ? i.variants[0] : i; return +p.price ? pct((+p.price - (+p.cost || 0)) / +p.price) : '—'; };
@@ -383,7 +386,7 @@ function pItems(b) {
     </div><button class="btn" id="additem">${ICON.plus} Add item</button></div>
     <div class="card">${!items.length ? `<div class="empty"><h3>Wala pang items</h3><p>Idagdag ang bawat produkto na may presyo at cost, para makita ang gross profit sa reports.</p><div class="actions" style="justify-content:center"><button class="btn" id="starter">Use starter menu</button></div></div>` :
     `<div class="tblwrap"><table class="tbl"><thead><tr><th>Item name</th><th>Category</th><th class="r">Price</th><th class="r">Cost</th><th class="r">Margin</th><th class="r">In stock</th></tr></thead><tbody>
-    ${list.map(i => `<tr class="click" data-i="${i.id}"><td><span style="display:flex;align-items:center;gap:10px"><span class="sw" style="${tcol(i.color)};width:32px;height:32px;border-radius:9px;font-size:13px">${esc(initials(i.name))}</span><span><span class="t1">${esc(i.name)}</span>${i.active === false ? ' <span class="pill n">Hidden</span>' : ''}${hasVariants(i) ? `<div class="sub">${i.variants.map(v => esc(v.name)).join(' · ')}</div>` : ''}</span></span></td><td>${esc(i.category || 'Other')}</td><td class="r num">${priceTxt(i)}</td><td class="r num">${costTxt(i)}</td><td class="r num">${margin(i)}</td><td class="r num">${tracked(i) ? `<span class="pill ${+i.stock <= 0 ? 'ref' : +i.stock <= (+i.lowAt || 5) ? 'low' : 'ok'}">${+i.stock}</span>` : '—'}</td></tr>`).join('') || `<tr><td colspan="6" class="sub">Walang tugma</td></tr>`}</tbody></table></div>`}</div>`;
+    ${list.map(i => `<tr class="click" data-i="${i.id}"><td><span style="display:flex;align-items:center;gap:10px"><span class="sw" style="${tcol(i.color)};width:32px;height:32px;border-radius:9px;font-size:13px">${esc(initials(i.name))}</span><span><span class="t1">${esc(i.name)}</span>${i.active === false ? ' <span class="pill n">Hidden</span>' : ''}${hasVariants(i) ? `<div class="sub">${i.variants.map(v => esc(v.name)).join(' · ')}</div>` : ''}</span></span></td><td>${esc(pathTxt(i))}</td><td class="r num">${priceTxt(i)}</td><td class="r num">${costTxt(i)}</td><td class="r num">${margin(i)}</td><td class="r num">${tracked(i) ? `<span class="pill ${+i.stock <= 0 ? 'ref' : +i.stock <= (+i.lowAt || 5) ? 'low' : 'ok'}">${+i.stock}</span>` : '—'}</td></tr>`).join('') || `<tr><td colspan="6" class="sub">Walang tugma</td></tr>`}</tbody></table></div>`}</div>`;
   const iq = $('iq'); iq.addEventListener('input', () => { itemQ = iq.value.trim().toLowerCase(); const p = iq.selectionStart; pItems(b); const n = $('iq'); n.focus(); n.setSelectionRange(p, p); });
   $('icat').addEventListener('change', e => { itemCat = e.target.value; pItems(b); });
   b.querySelectorAll('[data-st]').forEach(x => x.addEventListener('click', () => { itemStock = x.dataset.st; pItems(b); }));
@@ -400,7 +403,11 @@ function editItem(it) {
   const cats = [...new Set(Store.data.items.map(i => i.category || 'Other'))];
   const m = modal(head(isNew ? 'New item' : 'Edit item') + `<form id="itf" style="display:flex;flex-direction:column;gap:14px">
     <div class="field"><label for="iname">Name</label><input id="iname" required maxlength="50" value="${esc(it.name)}" placeholder="e.g. Cheese Fries"></div>
-    <div class="field"><label for="icatn">Category</label><input id="icatn" list="catlist" maxlength="24" value="${esc(it.category)}" placeholder="e.g. Fries"><datalist id="catlist">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
+    <div class="catgrid">
+      <div class="field"><label for="icatn">Category</label><input id="icatn" list="catlist" maxlength="24" value="${esc(it.category)}" placeholder="e.g. Fries"><datalist id="catlist">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
+      <div class="field"><label for="isub">Subcategory <span class="opt">optional</span></label><input id="isub" list="sublist" maxlength="24" value="${esc(it.sub || '')}" placeholder="e.g. Flavored"><datalist id="sublist"></datalist></div>
+      <div class="field"><label for="isub2">Sub-subcategory <span class="opt">optional</span></label><input id="isub2" list="sub2list" maxlength="24" value="${esc(it.sub2 || '')}" placeholder="e.g. Cheesy"><datalist id="sub2list"></datalist></div>
+    </div>
     <div class="toggle"><span>May sizes<div class="sub">Regular, Large, Barkada… bawat isa may presyo at cost</div></span><button type="button" class="switch" role="switch" id="iv" aria-checked="${useV}" aria-label="Has sizes"></button></div>
     <div id="pricebox" style="display:grid;grid-template-columns:1fr 1fr;gap:10px" ${useV ? 'hidden' : ''}><div class="field"><label for="iprice">Price (₱)</label><input id="iprice" type="number" inputmode="decimal" min="0" step="0.01" value="${esc(it.price ?? '')}"></div><div class="field"><label for="icost">Cost (₱)</label><input id="icost" type="number" inputmode="decimal" min="0" step="0.01" value="${esc(it.cost ?? '')}"></div></div>
     <div class="field" id="varbox" ${useV ? '' : 'hidden'}><div class="vhead"><span>Size</span><span>Price ₱</span><span>Cost ₱</span><span></span></div><div id="vrows" style="display:flex;flex-direction:column;gap:8px"></div><button type="button" class="btn ghost sm" id="vadd">+ Add size</button></div>
@@ -424,11 +431,21 @@ function editItem(it) {
   flip('its', v => { track = v; $('stockbox').hidden = !v; });
   flip('iact', v => { active = v; });
   m.querySelectorAll('#sws button').forEach(x => x.addEventListener('click', () => { color = +x.dataset.c; m.querySelectorAll('#sws button').forEach(y => y.setAttribute('aria-pressed', y === x)); }));
+  const opts = a => [...new Set(a.filter(Boolean))].sort().map(v => `<option value="${esc(v)}">`).join('');
+  const fillLists = () => {
+    const c = $('icatn').value.trim() || 'Other', s = $('isub').value.trim();
+    const inCat = Store.data.items.filter(i => (i.category || 'Other') === c);
+    $('sublist').innerHTML = opts(inCat.map(i => i.sub));
+    $('sub2list').innerHTML = opts(inCat.filter(i => i.sub === s).map(i => i.sub2));
+    $('isub2').disabled = !s; $('isub2').placeholder = s ? 'e.g. Cheesy' : 'Lagyan muna ng subcategory';
+  };
+  ['icatn', 'isub'].forEach(id => $(id).addEventListener('input', fillLists)); fillLists();
   const err = t => { $('ierr').textContent = t; $('ierr').hidden = false; };
   $('itf').addEventListener('submit', async e => {
     e.preventDefault();
     const name = $('iname').value.trim(); if (!name) return err('Ilagay ang pangalan ng item.');
-    const out = { id: it.id, name, category: $('icatn').value.trim() || 'Other', color, variants: [], price: 0, cost: 0, stock: null, lowAt: 5, active };
+    const sub = $('isub').value.trim(), sub2 = sub ? $('isub2').value.trim() : '';
+    const out = { id: it.id, name, category: $('icatn').value.trim() || 'Other', sub, sub2, color, variants: [], price: 0, cost: 0, stock: null, lowAt: 5, active };
     if (useV) {
       const vs = vars.filter(v => String(v.name).trim() || v.price !== '').map(v => ({ name: String(v.name).trim(), price: r2(parseFloat(v.price)), cost: r2(parseFloat(v.cost) || 0) }));
       if (!vs.length || vs.some(v => !v.name || isNaN(v.price))) return err('Lagyan ng pangalan at presyo ang bawat size.');
@@ -442,18 +459,50 @@ function editItem(it) {
   });
   const d = $('idel'); if (d) d.addEventListener('click', async () => { if (!armed(d, 'Tap again to delete')) return; await Store.del('items', it.id); closeModal(); toast('Item deleted'); });
 }
+const pathOf = i => [i.category || 'Other', i.sub || '', i.sub2 || ''];
+const pathTxt = i => pathOf(i).filter(Boolean).join(' › ');
+function catTree() {
+  const tree = new Map(), node = (m, k) => { if (!m.has(k)) m.set(k, { items: [], subs: new Map() }); return m.get(k); };
+  for (const i of Store.data.items) {
+    const [c, s, s2] = pathOf(i), C = node(tree, c); C.items.push(i);
+    if (!s) continue; const S = node(C.subs, s); S.items.push(i);
+    if (s2) node(S.subs, s2).items.push(i);
+  }
+  return tree;
+}
 function pCategories(b) {
-  const by = new Map(); Store.data.items.forEach(i => { const c = i.category || 'Other'; if (!by.has(c)) by.set(c, []); by.get(c).push(i); });
-  b.innerHTML = `<div class="card list">${[...by].sort((a, z) => a[0].localeCompare(z[0])).map(([c, arr]) => `<button class="it" data-c="${esc(c)}"><span class="sw" style="${tcol(arr[0].color)}">${esc(initials(c))}</span><span class="grow"><span class="t1">${esc(c)}</span><div class="sub">${arr.length} item${arr.length === 1 ? '' : 's'}</div></span>${ICON.next}</button>`).join('') || `<div class="empty"><p>Lalabas dito ang mga category kapag may items na.</p></div>`}</div>
-    <div class="sub">Gumagawa ng category kapag nag-type ka ng bagong category sa isang item.</div>`;
-  b.querySelectorAll('[data-c]').forEach(x => x.addEventListener('click', () => {
-    const c = x.dataset.c, arr = by.get(c); let color = +arr[0].color || 0;
-    const m = modal(head('Edit category', `${arr.length} items`) + `<div class="field"><label for="cn">Name</label><input id="cn" value="${esc(c)}" maxlength="24"></div>
-      <div class="field"><span class="flabel">Kulay ng lahat ng items dito</span><div class="swatches" id="csw">${[...Array(NCOL)].map((_, i) => `<button type="button" style="${tcol(i)}" aria-pressed="${i === color}" data-k="${i}" aria-label="Color ${i + 1}"></button>`).join('')}</div></div>
-      <div class="actions"><button class="btn" id="csave">Save</button></div>`);
-    m.querySelectorAll('[data-k]').forEach(y => y.addEventListener('click', () => { color = +y.dataset.k; m.querySelectorAll('[data-k]').forEach(z => z.setAttribute('aria-pressed', z === y)); }));
-    $('csave').addEventListener('click', async () => { const n = $('cn').value.trim() || c; $('csave').disabled = true; for (const i of arr) await Store.put('items', { ...i, category: n, color }); closeModal(); toast('Na-save ang category'); });
-  }));
+  const sorted = m => [...m].sort((a, z) => a[0].localeCompare(z[0]));
+  const row = (path, n) => {
+    const lv = path.length, label = path[lv - 1];
+    return `<button class="it tree l${lv}" data-path="${esc(JSON.stringify(path))}">${lv === 1 ? `<span class="sw" style="${tcol(n.items[0].color)}">${esc(initials(label))}</span>` : '<span class="branch" aria-hidden="true"></span>'}<span class="grow"><span class="t1">${esc(label)}</span><div class="sub">${LEVELS[lv - 1]} · ${n.items.length} item${n.items.length === 1 ? '' : 's'}${n.subs.size ? ` · ${n.subs.size} ${lv === 1 ? 'subcategor' + (n.subs.size === 1 ? 'y' : 'ies') : 'sub-subcategor' + (n.subs.size === 1 ? 'y' : 'ies')}` : ''}</div></span>${ICON.next}</button>`;
+  };
+  let html = '';
+  for (const [c, C] of sorted(catTree())) {
+    html += row([c], C);
+    for (const [s, S] of sorted(C.subs)) { html += row([c, s], S); for (const [s2, S2] of sorted(S.subs)) html += row([c, s, s2], S2); }
+  }
+  b.innerHTML = `<div class="card list">${html || `<div class="empty"><p>Lalabas dito ang mga category kapag may items na.</p></div>`}</div>
+    <div class="sub">Para gumawa ng subcategory o sub-subcategory, buksan ang item sa <a class="link" href="#items">Item list</a> at punan ang Subcategory at Sub-subcategory. Lalabas ang mga ito sa POS bilang hilera ng buttons sa ilalim ng category.</div>`;
+  b.querySelectorAll('[data-path]').forEach(x => x.addEventListener('click', () => editCatNode(JSON.parse(x.dataset.path))));
+}
+function editCatNode(path) {
+  const lv = path.length, cur = path[lv - 1], label = LEVELS[lv - 1];
+  const arr = Store.data.items.filter(i => { const p = pathOf(i); return path.every((v, k) => p[k] === v); });
+  if (!arr.length) return;
+  let color = +arr[0].color || 0;
+  const m = modal(head('Edit ' + label.toLowerCase(), (lv > 1 ? esc(path.slice(0, -1).join(' › ')) + ' · ' : '') + `${arr.length} item${arr.length === 1 ? '' : 's'}`) + `
+    <div class="field"><label for="cn">Name</label><input id="cn" value="${esc(cur)}" maxlength="24"></div>
+    ${lv === 1 ? `<div class="field"><span class="flabel">Kulay ng lahat ng items dito</span><div class="swatches" id="csw">${[...Array(NCOL)].map((_, i) => `<button type="button" style="${tcol(i)}" aria-pressed="${i === color}" data-k="${i}" aria-label="Color ${i + 1}"></button>`).join('')}</div></div>` : `<div class="sub">Kapag tinanggal, mananatili ang ${arr.length === 1 ? 'item' : 'mga item'} sa ${esc(path[lv - 2])}.</div>`}
+    <div class="err" id="cerr" hidden></div>
+    <div class="actions">${lv > 1 ? `<button class="btn danger" id="crm" style="flex:0 0 auto">${ICON.trash} Remove</button>` : ''}<button class="btn" id="csave">Save</button></div>`, { focus: '#cn' });
+  m.querySelectorAll('[data-k]').forEach(y => y.addEventListener('click', () => { color = +y.dataset.k; m.querySelectorAll('[data-k]').forEach(z => z.setAttribute('aria-pressed', z === y)); }));
+  const field = ['category', 'sub', 'sub2'][lv - 1];
+  const apply = async (fn, done) => { $('csave').disabled = true; for (const i of arr) await Store.put('items', { ...i, ...fn(i) }); closeModal(); toast(done); };
+  $('csave').addEventListener('click', () => {
+    const n = $('cn').value.trim(); if (!n) { $('cerr').textContent = 'Ilagay ang pangalan.'; $('cerr').hidden = false; return; }
+    apply(() => lv === 1 ? { category: n, color } : { [field]: n }, 'Na-save ang ' + label.toLowerCase());
+  });
+  const rm = $('crm'); if (rm) rm.addEventListener('click', () => { if (!armed(rm, 'Tap again to remove')) return; apply(() => lv === 2 ? { sub: '', sub2: '' } : { sub2: '' }, 'Natanggal ang ' + label.toLowerCase()); });
 }
 function pDiscounts(b) {
   b.innerHTML = `<div class="ph"><span class="sub">Lalabas ang mga ito sa POS kapag pinindot ang “Add discount”.</span><button class="btn" id="adddisc">${ICON.plus} Add discount</button></div>

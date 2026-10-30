@@ -26,13 +26,13 @@ export const DEFAULT_DISCOUNTS = [
 ];
 const V = (name, price, cost) => ({ name, price, cost });
 export const STARTER_ITEMS = [
-  { name: 'Classic Salted Fries', category: 'Fries', color: 0, variants: [V('Regular', 59, 22), V('Large', 89, 33), V('Barkada', 149, 55)] },
-  { name: 'Cheese Fries', category: 'Flavored', color: 1, variants: [V('Regular', 69, 26), V('Large', 99, 38), V('Barkada', 169, 64)] },
-  { name: 'Sour Cream Fries', category: 'Flavored', color: 4, variants: [V('Regular', 69, 26), V('Large', 99, 38), V('Barkada', 169, 64)] },
-  { name: 'BBQ Fries', category: 'Flavored', color: 2, variants: [V('Regular', 69, 26), V('Large', 99, 38), V('Barkada', 169, 64)] },
+  { name: 'Classic Salted Fries', category: 'Fries', sub: 'Classic', color: 0, variants: [V('Regular', 59, 22), V('Large', 89, 33), V('Barkada', 149, 55)] },
+  { name: 'Cheese Fries', category: 'Fries', sub: 'Flavored', sub2: 'Cheesy', color: 1, variants: [V('Regular', 69, 26), V('Large', 99, 38), V('Barkada', 169, 64)] },
+  { name: 'Sour Cream Fries', category: 'Fries', sub: 'Flavored', sub2: 'Cheesy', color: 4, variants: [V('Regular', 69, 26), V('Large', 99, 38), V('Barkada', 169, 64)] },
+  { name: 'BBQ Fries', category: 'Fries', sub: 'Flavored', sub2: 'Smoky', color: 2, variants: [V('Regular', 69, 26), V('Large', 99, 38), V('Barkada', 169, 64)] },
   { name: 'Fries + Iced Tea Combo', category: 'Combos', color: 6, price: 89, cost: 34, variants: [] },
-  { name: 'Extra Cheese Dip', category: 'Add-ons', color: 3, price: 20, cost: 7, variants: [] },
-  { name: 'Garlic Mayo Dip', category: 'Add-ons', color: 3, price: 20, cost: 6, variants: [] },
+  { name: 'Extra Cheese Dip', category: 'Add-ons', sub: 'Dips', color: 3, price: 20, cost: 7, variants: [] },
+  { name: 'Garlic Mayo Dip', category: 'Add-ons', sub: 'Dips', color: 3, price: 20, cost: 6, variants: [] },
   { name: 'Iced Tea', category: 'Drinks', color: 5, variants: [V('Regular', 35, 9), V('Large', 45, 12)] },
   { name: 'Bottled Water', category: 'Drinks', color: 5, price: 20, cost: 11, variants: [] }
 ];
@@ -41,7 +41,7 @@ const sorters = {
   sales: (a, b) => b.ts - a.ts,
   shifts: (a, b) => b.openedAt - a.openedAt,
   tickets: (a, b) => a.ts - b.ts,
-  items: (a, b) => (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || ''),
+  items: (a, b) => (a.category || '').localeCompare(b.category || '') || (a.sub || '').localeCompare(b.sub || '') || (a.sub2 || '').localeCompare(b.sub2 || '') || (a.name || '').localeCompare(b.name || ''),
   employees: (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
   discounts: (a, b) => (a.name || '').localeCompare(b.name || ''),
   zreads: (a, b) => b.createdAt - a.createdAt

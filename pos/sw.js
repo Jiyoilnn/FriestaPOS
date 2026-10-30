@@ -1,7 +1,7 @@
 // Friesta POS — offline support.
 // App files: network first (fresh when online), cached copy when offline.
 // Fonts and the optional Firebase SDK: cached after first use.
-const VERSION = 'pos-v2';
+const VERSION = 'pos-v3';
 const CORE = [
   './', './index.html', './app.js', './pos.css', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   '../shared/base.css', '../shared/util.js', '../shared/store.js', '../shared/metrics.js',
